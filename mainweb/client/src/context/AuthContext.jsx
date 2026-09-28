@@ -31,8 +31,7 @@ export function AuthProvider({ children }) {
 
   async function register(payload) {
     const { data } = await api.post('/auth/register', payload);
-    persistUserSession(data.token, data.user);
-    return data.user;
+    return data;
   }
 
   function logout() {

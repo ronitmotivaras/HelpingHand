@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Leaf, Phone, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -7,7 +7,8 @@ import { useAuth } from '../context/AuthContext';
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [mobile, setMobile] = useState('');
+  const location = useLocation();
+  const [mobile, setMobile] = useState(location.state?.mobile || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -62,7 +63,7 @@ export default function Login() {
                 placeholder="e.g. 9876543210"
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
-                autoFocus
+                autoFocus={!location.state?.mobile}
                 required
               />
             </div>
@@ -91,6 +92,7 @@ export default function Login() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoFocus={Boolean(location.state?.mobile)}
                 required
               />
               <button

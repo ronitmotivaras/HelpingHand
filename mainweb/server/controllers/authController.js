@@ -43,11 +43,10 @@ async function register(req, res) {
       city: city.trim(),
     });
 
-    const token = jwt.sign({ type: 'user', id: user._id }, process.env.USER_JWT_SECRET, {
-      expiresIn: '7d',
+    return res.status(201).json({
+      message: 'Account created successfully. Please sign in.',
+      user: sanitizeUser(user),
     });
-
-    return res.status(201).json({ token, user: sanitizeUser(user) });
   } catch (err) {
     if (err.code === 11000) {
       return res.status(409).json({ message: 'Mobile number is already registered' });

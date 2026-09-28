@@ -47,8 +47,8 @@ export default function Register() {
     setLoading(true);
     try {
       await register(form);
-      toast.success('Account created successfully! Welcome to HelpingHand.');
-      navigate('/');
+      toast.success('Account created successfully! Please sign in.');
+      navigate('/login', { state: { mobile: form.mobile } });
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
     } finally {
