@@ -53,7 +53,7 @@ async function adminLogin(req, res) {
       return res.status(401).json({ message: 'Invalid admin password' });
     }
 
-    const token = jwt.sign({ type: 'admin' }, process.env.JWT_SECRET, { expiresIn: '12h' });
+    const token = jwt.sign({ type: 'admin' }, process.env.ADMIN_JWT_SECRET, { expiresIn: '12h' });
     return res.json({ token });
   } catch (err) {
     return res.status(500).json({ message: 'Admin login failed' });

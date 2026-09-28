@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.post('/login', adminLogin);
 
-router.get('/stats', getStats);
+router.get('/stats', adminMiddleware, getStats);
 router.get('/ngo-requests', adminMiddleware, listNgoRequests);
 
 router.patch('/ngo-requests/:id/approve', adminMiddleware, approveNgo);

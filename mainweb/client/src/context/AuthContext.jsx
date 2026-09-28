@@ -14,10 +14,10 @@ function readUser() {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(readUser);
-  const [token, setToken] = useState(() => localStorage.getItem('hh_token'));
+  const [token, setToken] = useState(() => localStorage.getItem('userToken'));
 
   function persistUserSession(nextToken, nextUser) {
-    localStorage.setItem('hh_token', nextToken);
+    localStorage.setItem('userToken', nextToken);
     localStorage.setItem('hh_user', JSON.stringify(nextUser));
     setToken(nextToken);
     setUser(nextUser);
@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
-    localStorage.removeItem('hh_token');
+    localStorage.removeItem('userToken');
     localStorage.removeItem('hh_user');
     setToken(null);
     setUser(null);

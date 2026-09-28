@@ -5,20 +5,18 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [adminToken, setAdminToken] = useState(
-    () => localStorage.getItem('adminToken') || localStorage.getItem('hh_admin_token')
+    () => localStorage.getItem('adminToken')
   );
 
   async function adminLogin(password) {
     const { data } = await api.post('/api/admin/login', { password });
     localStorage.setItem('adminToken', data.token);
-    localStorage.setItem('hh_admin_token', data.token);
     setAdminToken(data.token);
     return data;
   }
 
   function adminLogout() {
     localStorage.removeItem('adminToken');
-    localStorage.removeItem('hh_admin_token');
     setAdminToken(null);
   }
 

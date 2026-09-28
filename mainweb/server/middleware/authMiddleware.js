@@ -9,7 +9,7 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.USER_JWT_SECRET);
     if (payload.type !== 'user' || !payload.id) {
       return res.status(401).json({ message: 'Invalid token' });
     }
