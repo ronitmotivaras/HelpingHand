@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Leaf, LayoutDashboard, BadgeCheck, Users, LogOut } from 'lucide-react';
+import { Leaf, LayoutDashboard, BadgeCheck, Users, LogOut, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AdminSidebar({ pendingCount, usersCount }) {
@@ -73,6 +73,17 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
                 {typeof usersCount === 'number' && usersCount > 0 && (
                   <span className="nav-count-badge">{usersCount}</span>
                 )}
+              </button>
+            </li>
+            <li>
+              <button
+                className={`admin-nav-link ${currentPath === '/change-password' ? 'active' : ''}`}
+                onClick={() => navigate('/change-password')}
+              >
+                <span className="nav-icon">
+                  <KeyRound size={16} strokeWidth={2} />
+                </span>
+                <span className="nav-label">Change Password</span>
               </button>
             </li>
           </ul>

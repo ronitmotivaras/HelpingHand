@@ -2,6 +2,7 @@ const express = require('express');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const {
   adminLogin,
+  changePassword,
   getStats,
   listNgoRequests,
   approveNgo,
@@ -15,6 +16,7 @@ const router = express.Router();
 
 router.post('/login', adminLogin);
 
+router.patch('/change-password', adminMiddleware, changePassword);
 router.get('/stats', adminMiddleware, getStats);
 router.get('/ngo-requests', adminMiddleware, listNgoRequests);
 
