@@ -1,7 +1,15 @@
 import axios from 'axios';
 
+const rawBaseUrl = process.env.REACT_APP_API_URL;
+let baseURL = '/api';
+
+if (rawBaseUrl) {
+  const clean = rawBaseUrl.replace(/\/+$/, '');
+  baseURL = clean.endsWith('/api') ? clean : `${clean}/api`;
+}
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL,
 });
 
 api.interceptors.request.use((config) => {
@@ -13,3 +21,4 @@ api.interceptors.request.use((config) => {
 });
 
 export default api;
+

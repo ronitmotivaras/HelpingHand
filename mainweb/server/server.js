@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const mongoose = require('mongoose');
 const startExpireListingsJob = require('./jobs/expireListings');
 const authRoutes = require('./routes/auth');
 const donationRoutes = require('./routes/donations');
@@ -13,9 +14,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true });
+app.get(['/api/health', '/health'], (req, res) => {
+  const isDbConnected = mongoose.connection.readyState === 1;
+  res.json({
+    status: 'ok',
+    db: isDbConnected ? 'connected' : 'disconnected',
+    dbName: mongoose.connection.name || 'none',
+  });
 });
+
 
 app.use('/api/auth', authRoutes);
 app.use('/api/donations', donationRoutes);

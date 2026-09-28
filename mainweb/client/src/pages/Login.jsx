@@ -24,7 +24,7 @@ export default function Login() {
       toast.success('Welcome back to HelpingHand!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Invalid mobile number or password');
+      toast.error(err.response?.data?.message || err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
