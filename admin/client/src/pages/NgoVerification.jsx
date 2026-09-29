@@ -278,17 +278,6 @@ export default function NgoVerification() {
                             <span>Revoke</span>
                           </button>
                         )}
-                        {isRejected && (
-                          <button
-                            className="btn-admin-primary d-inline-flex align-items-center gap-1"
-                            disabled={isProcessing}
-                            onClick={() => handleApprove(ngo.id, ngoName)}
-                            title="Re-approve NGO"
-                          >
-                            <CheckCircle2 size={15} />
-                            <span>Re-Approve</span>
-                          </button>
-                        )}
                       </div>
                     </div>
 
