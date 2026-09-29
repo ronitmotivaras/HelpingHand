@@ -141,33 +141,6 @@ The admin panel will be available at **http://localhost:3001**.
 
 ---
 
-## 🗄️ Data Models
-
-### User
-| Field | Type | Notes |
-|---|---|---|
-| `name` | String | Required |
-| `mobile` | String | Unique, used as login identifier |
-| `passwordHash` | String | bcrypt hashed |
-| `city` | String | Required |
-| `ngoStatus` | Enum | `none` \| `pending` \| `approved` \| `rejected` |
-| `ngoDetails` | Object | NGO name, address, city, contact |
-
-### FoodDonation
-| Field | Type | Notes |
-|---|---|---|
-| `donorId` | ObjectId | Reference to User |
-| `donorName` | String | — |
-| `donorPhone` | String | — |
-| `foodName` | String | — |
-| `quantity` | String | — |
-| `foodType` | Enum | `veg` \| `nonveg` |
-| `availableUpto` | Date | Listing expires after this |
-| `address` / `city` | String | Pickup location |
-| `status` | Enum | `available` \| `accepted` \| `picked_up` \| `expired` |
-
----
-
 ## 🔌 API Overview
 
 ### Main Web API (`http://localhost:5000`)
@@ -194,34 +167,3 @@ The admin panel will be available at **http://localhost:3001**.
 | GET | `/api/users` | List all users |
 | PATCH | `/api/users/:id/ngo-status` | Approve or reject NGO application |
 | GET | `/api/health` | Health check |
-
----
-
-## 📜 Available Scripts
-
-Each sub-project supports the following npm scripts:
-
-| Script | Description |
-|---|---|
-| `npm run dev` | Start development server with hot-reload (nodemon) |
-| `npm start` | Start production server |
-| `npm run hash-password` | Generate a bcrypt hash for the admin password |
-| `npm run build` | Build the React client for production |
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please open an issue first to discuss any major changes.
-
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/my-feature`
-3. Commit your changes: `git commit -m 'Add my feature'`
-4. Push to the branch: `git push origin feature/my-feature`
-5. Open a Pull Request
-
----
-
-## 📄 License
-
-This project is open source. See [LICENSE](LICENSE) for details.
