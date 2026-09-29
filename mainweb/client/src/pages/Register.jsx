@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Leaf, UserCircle, Phone, Lock, MapPin, AlertCircle, Building2, User } from 'lucide-react';
+import { Leaf, UserCircle, Phone, Lock, MapPin, AlertCircle, Building2, User, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { validatePassword, validateMobile } from '../utils/validation';
 import { CITIES } from '../constants/cities';
@@ -156,6 +156,14 @@ export default function Register() {
   return (
     <div className="hh-auth-wrap" style={{ minHeight: '100vh', padding: 'var(--space-4) var(--space-3)' }}>
       <div className="hh-auth-card" style={{ maxWidth: '490px', padding: 'var(--space-5) var(--space-6)' }}>
+        <Link
+          to="/login"
+          className="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none"
+          style={{ fontSize: 'var(--text-small)', fontWeight: 600, color: 'var(--color-primary)' }}
+        >
+          <ArrowLeft size={16} />
+          <span>Back to login</span>
+        </Link>
         <div className="d-flex align-items-center gap-2 mb-1">
           <Leaf size={26} color="var(--color-primary)" strokeWidth={2.5} />
           <h1 className="section-title mb-0" style={{ color: 'var(--color-primary)', fontSize: '22px' }}>Join HelpingHand</h1>
@@ -320,7 +328,7 @@ export default function Register() {
                   type="password"
                   className="form-control"
                   style={{ paddingLeft: '2.4rem' }}
-                  placeholder="6–30 chars (letters, numbers, @)"
+                  placeholder="Enter password"
                   value={donatorForm.password}
                   onChange={(e) => updateDonator('password', e.target.value)}
                   onPaste={(e) => e.preventDefault()}
@@ -542,7 +550,7 @@ export default function Register() {
                   type="password"
                   className="form-control"
                   style={{ paddingLeft: '2.4rem' }}
-                  placeholder="6–30 chars (letters, numbers, @)"
+                  placeholder="Enter password"
                   value={ngoForm.password}
                   onChange={(e) => updateNgo('password', e.target.value)}
                   onPaste={(e) => e.preventDefault()}

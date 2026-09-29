@@ -155,10 +155,7 @@ export default function UserAccounts() {
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
           <div>
-            <div className="admin-breadcrumb">Admin / Donators</div>
-            <h1 className="admin-page-title">
-              Donator Accounts {users !== null && `(${users.length} total)`}
-            </h1>
+            <h1 className="admin-page-title">Donators</h1>
           </div>
         </div>
 

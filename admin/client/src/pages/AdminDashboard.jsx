@@ -78,7 +78,6 @@ export default function AdminDashboard() {
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
           <div>
-            <div className="admin-breadcrumb">Admin / Overview</div>
             <h1 className="admin-page-title">System Overview</h1>
           </div>
         </div>

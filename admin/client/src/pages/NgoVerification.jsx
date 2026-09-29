@@ -112,10 +112,7 @@ export default function NgoVerification() {
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
           <div>
-            <div className="admin-breadcrumb">Admin / NGO List</div>
-            <h1 className="admin-page-title">
-              Registered NGOs {ngos !== null && `(${ngos.length} total)`}
-            </h1>
+            <h1 className="admin-page-title">Registered NGOs</h1>
           </div>
         </div>
 
