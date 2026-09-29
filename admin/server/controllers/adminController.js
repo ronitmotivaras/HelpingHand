@@ -28,11 +28,13 @@ function sanitizeUser(user) {
 
 const getStats = async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
+    const totalDonators = await User.countDocuments({ ngoStatus: 'none' });
+    const totalUsers = totalDonators;
+    const totalNgos = await User.countDocuments({ ngoStatus: { $ne: 'none' } });
     const pendingNgoReviews = await User.countDocuments({ ngoStatus: 'pending' });
     const verifiedNgoPartners = await User.countDocuments({ ngoStatus: 'approved' });
 
-    res.json({ totalUsers, pendingNgoReviews, verifiedNgoPartners });
+    res.json({ totalUsers, totalDonators, totalNgos, pendingNgoReviews, verifiedNgoPartners });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch stats' });
   }
@@ -64,10 +66,15 @@ async function adminLogin(req, res) {
 
 async function listNgoRequests(req, res) {
   try {
-    const users = await User.find({ ngoStatus: 'pending' }).sort({ createdAt: -1 });
+    const { status } = req.query;
+    let query = { ngoStatus: { $ne: 'none' } };
+    if (status && status !== 'all') {
+      query.ngoStatus = status;
+    }
+    const users = await User.find(query).sort({ createdAt: -1 });
     return res.json(users.map(sanitizeUser));
   } catch (err) {
-    return res.status(500).json({ message: 'Failed to load NGO requests' });
+    return res.status(500).json({ message: 'Failed to load NGO list' });
   }
 }
 
@@ -107,7 +114,17 @@ async function rejectNgo(req, res) {
 
 async function listUsers(req, res) {
   try {
-    const users = await User.find().sort({ createdAt: -1 });
+    const { type } = req.query;
+    let query = {};
+    if (type === 'donator') {
+      query = { ngoStatus: 'none' };
+    } else if (type === 'ngo') {
+      query = { ngoStatus: { $ne: 'none' } };
+    } else {
+      // Default to donators to keep donators separate from NGOs
+      query = { ngoStatus: 'none' };
+    }
+    const users = await User.find(query).sort({ createdAt: -1 });
     return res.json(users.map(sanitizeUser));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to load users' });
@@ -121,18 +138,40 @@ async function updateUser(req, res) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { mobile, newPassword } = req.body;
+    const { name, mobile, city, newPassword } = req.body;
+
+    if (name && String(name).trim()) {
+      user.name = String(name).trim();
+    }
+
+    if (city && String(city).trim()) {
+      user.city = String(city).trim();
+    }
+
     if (mobile) {
-      const taken = await User.findOne({ mobile: String(mobile).trim(), _id: { $ne: user._id } });
+      const cleanMobile = String(mobile).trim();
+      if (!/^\d{10}$/.test(cleanMobile)) {
+        return res.status(400).json({ message: 'Mobile number must be exactly 10 digits (0-9 only)' });
+      }
+      const taken = await User.findOne({ mobile: cleanMobile, _id: { $ne: user._id } });
       if (taken) {
         return res.status(409).json({ message: 'Mobile number is already in use' });
       }
-      user.mobile = String(mobile).trim();
+      user.mobile = cleanMobile;
+      if (user.ngoDetails) {
+        user.ngoDetails.contactNum = cleanMobile;
+      }
     }
 
     if (newPassword) {
       if (newPassword.length < 6) {
         return res.status(400).json({ message: 'New password must be at least 6 characters' });
+      }
+      if (newPassword.length > 30) {
+        return res.status(400).json({ message: 'New password must be no more than 30 characters' });
+      }
+      if (/[^a-zA-Z0-9@]/.test(newPassword)) {
+        return res.status(400).json({ message: 'New password can only contain letters, numbers, and @' });
       }
       user.passwordHash = await bcrypt.hash(newPassword, 10);
     }

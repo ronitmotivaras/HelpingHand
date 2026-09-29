@@ -20,6 +20,9 @@ async function updateProfile(req, res) {
     }
 
     const trimmedMobile = String(mobile).trim();
+    if (!/^\d{10}$/.test(trimmedMobile)) {
+      return res.status(400).json({ message: 'Mobile number must be exactly 10 digits (0-9 only)' });
+    }
     if (trimmedMobile !== req.user.mobile) {
       const taken = await User.findOne({ mobile: trimmedMobile, _id: { $ne: req.user._id } });
       if (taken) {
@@ -77,6 +80,11 @@ async function applyNgo(req, res) {
       return res.status(400).json({ message: 'All NGO fields are required' });
     }
 
+    const cleanContact = String(contactNum).trim();
+    if (!/^\d{10}$/.test(cleanContact)) {
+      return res.status(400).json({ message: 'Contact number must be exactly 10 digits (0-9 only)' });
+    }
+
     if (req.user.ngoStatus === 'pending') {
       return res.status(400).json({ message: 'NGO application is already pending' });
     }
@@ -88,7 +96,7 @@ async function applyNgo(req, res) {
       ngoName: ngoName.trim(),
       address: address.trim(),
       city: city.trim(),
-      contactNum: String(contactNum).trim(),
+      contactNum: cleanContact,
     };
     req.user.ngoStatus = 'pending';
     await req.user.save();

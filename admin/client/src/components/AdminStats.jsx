@@ -4,13 +4,13 @@ import { Users, Clock, BadgeCheck } from 'lucide-react';
 export default function AdminStats({ stats, loading }) {
   const isLoading = loading || !stats;
 
-  const displayTotalUsers = stats?.totalUsers ?? '—';
+  const displayTotalDonators = (stats?.totalDonators ?? stats?.totalUsers) ?? '—';
   const displayPendingReviews = stats?.pendingNgoReviews ?? '—';
   const displayVerifiedPartners = stats?.verifiedNgoPartners ?? '—';
 
   return (
     <div className="admin-stats-grid">
-      {/* Total Users */}
+      {/* Total Donators */}
       <div className="admin-stat-card">
         <div
           className="admin-stat-icon-wrap"
@@ -18,12 +18,12 @@ export default function AdminStats({ stats, loading }) {
         >
           <Users size={20} color="var(--color-primary)" strokeWidth={2} />
         </div>
-        <div className="admin-stat-label">Total Users</div>
+        <div className="admin-stat-label">Total Donators</div>
         <div className="admin-stat-value">
           {isLoading ? (
             <div className="skeleton-box" style={{ width: '64px', height: '36px', marginTop: '4px' }} />
           ) : (
-            displayTotalUsers
+            displayTotalDonators
           )}
         </div>
       </div>

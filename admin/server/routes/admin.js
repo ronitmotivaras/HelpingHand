@@ -19,6 +19,7 @@ router.post('/login', adminLogin);
 router.patch('/change-password', adminMiddleware, changePassword);
 router.get('/stats', adminMiddleware, getStats);
 router.get('/ngo-requests', adminMiddleware, listNgoRequests);
+router.get('/ngos', adminMiddleware, listNgoRequests);
 
 router.patch('/ngo-requests/:id/approve', adminMiddleware, approveNgo);
 router.patch('/ngo-requests/:id/reject', adminMiddleware, rejectNgo);

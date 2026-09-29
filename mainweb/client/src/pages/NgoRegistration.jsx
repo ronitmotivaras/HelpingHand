@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, BadgeCheck, Clock } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Clock, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
+import { CITIES } from '../constants/cities';
+import { validateMobile } from '../utils/validation';
 
 export default function NgoRegistration() {
   const { user, refreshProfile } = useAuth();
@@ -15,6 +17,7 @@ export default function NgoRegistration() {
     city: user?.city || '',
     contactNum: user?.mobile || '',
   });
+  const [phoneError, setPhoneError] = useState('');
   const [loading, setLoading] = useState(false);
 
   if (user?.ngoStatus === 'pending' || user?.ngoStatus === 'approved') {
@@ -52,11 +55,37 @@ export default function NgoRegistration() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function handlePhoneChange(val) {
+    update('contactNum', val);
+    if (/[^0-9]/.test(val)) {
+      setPhoneError('Only numbers (0-9) are allowed. No characters, symbols, or spaces.');
+    } else if (val.length > 0 && val.length !== 10) {
+      setPhoneError('Mobile number must be exactly 10 digits');
+    } else {
+      setPhoneError('');
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
+
+    const mError = validateMobile(form.contactNum);
+    if (mError) {
+      setPhoneError(mError);
+      return;
+    }
+    if (!form.city.trim()) {
+      toast.error('Please select a city');
+      return;
+    }
+
     setLoading(true);
     try {
-      await api.post('/profile/apply-ngo', form);
+      await api.post('/profile/apply-ngo', {
+        ...form,
+        contactNum: form.contactNum.trim(),
+        city: form.city.trim(),
+      });
       toast.success('NGO verification application submitted successfully!');
       await refreshProfile();
       navigate('/profile');
@@ -66,6 +95,8 @@ export default function NgoRegistration() {
       setLoading(false);
     }
   }
+
+  const cityOptions = Array.from(new Set([...CITIES, ...(user?.city ? [user.city] : [])]));
 
   return (
     <>
@@ -77,25 +108,22 @@ export default function NgoRegistration() {
           style={{ fontSize: 'var(--text-small)', fontWeight: 600, color: 'var(--color-primary)' }}
         >
           <ArrowLeft size={16} />
-          <span>Back to profile</span>
+          <span>Back to Profile</span>
         </Link>
 
         <div className="hh-card">
-          <div className="d-flex align-items-center gap-2 mb-1">
-            <BadgeCheck size={24} color="var(--color-primary)" />
-            <h1 className="section-title m-0">Apply for NGO Verification</h1>
-          </div>
+          <h1 className="section-title mb-1">Apply for NGO Verification</h1>
           <p className="food-card-meta mb-4">
-            Help verify your organization so community donors can prioritize larger food rescues.
+            Register your food rescue charity, community shelter, or NGO with HelpingHand.
           </p>
 
           <form onSubmit={handleSubmit}>
             <div className="form-group mb-3">
-              <label className="form-label" htmlFor="ngo-name">Official Organization / Trust Name</label>
+              <label className="form-label" htmlFor="ngo-name">Organization / Trust Name</label>
               <input
                 id="ngo-name"
                 className="form-control"
-                placeholder="e.g. Seva Food Relief Foundation"
+                placeholder="e.g. Robin Hood Army, Annamrita Foundation"
                 value={form.ngoName}
                 onChange={(e) => update('ngoName', e.target.value)}
                 required
@@ -103,7 +131,7 @@ export default function NgoRegistration() {
             </div>
 
             <div className="form-group mb-3">
-              <label className="form-label" htmlFor="ngo-address">Operating Address / Hub</label>
+              <label className="form-label" htmlFor="ngo-address">Official Operating Address</label>
               <textarea
                 id="ngo-address"
                 className="form-control"
@@ -118,13 +146,20 @@ export default function NgoRegistration() {
             <div className="row g-3 mb-4">
               <div className="col-sm-6 form-group">
                 <label className="form-label" htmlFor="ngo-city">City / Region</label>
-                <input
+                <select
                   id="ngo-city"
-                  className="form-control"
+                  className="form-select"
                   value={form.city}
                   onChange={(e) => update('city', e.target.value)}
                   required
-                />
+                >
+                  <option value="">Select City...</option>
+                  {cityOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="col-sm-6 form-group">
@@ -132,10 +167,17 @@ export default function NgoRegistration() {
                 <input
                   id="ngo-contact"
                   className="form-control"
+                  placeholder="10-digit mobile number"
                   value={form.contactNum}
-                  onChange={(e) => update('contactNum', e.target.value)}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
                   required
                 />
+                {phoneError && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{phoneError}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -143,19 +185,8 @@ export default function NgoRegistration() {
               <button
                 className="btn-hh-primary w-100 justify-content-center d-flex align-items-center gap-2"
                 disabled={loading}
-                type="submit"
               >
-                {loading ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Submitting Application...</span>
-                  </>
-                ) : (
-                  <>
-                    <BadgeCheck size={18} />
-                    <span>Submit Verification Request</span>
-                  </>
-                )}
+                {loading ? 'Submitting Application...' : 'Submit Verification Request'}
               </button>
             </div>
           </form>

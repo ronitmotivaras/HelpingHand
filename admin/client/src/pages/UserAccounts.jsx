@@ -5,21 +5,24 @@ import {
   Trash2,
   Search,
   AlertTriangle,
-  BadgeCheck,
-  Clock,
-  XCircle,
+  MapPin,
 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import api from '../api/axiosInstance';
+import { CITIES } from '../constants/cities';
+import { validateMobile, validatePassword } from '../utils/validation';
 
 export default function UserAccounts() {
   const [users, setUsers] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
 
   // Edit Modal State
   const [editingUser, setEditingUser] = useState(null);
-  const [editForm, setEditForm] = useState({ mobile: '', newPassword: '' });
+  const [editForm, setEditForm] = useState({ name: '', mobile: '', city: '', newPassword: '' });
+  const [mobileError, setMobileError] = useState('');
+  const [passwordErrors, setPasswordErrors] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
   // Delete Confirmation Modal State
@@ -29,10 +32,10 @@ export default function UserAccounts() {
   async function loadUsers() {
     setLoading(true);
     try {
-      const res = await api.get('/api/admin/users');
+      const res = await api.get('/api/admin/users?type=donator');
       setUsers(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load user accounts');
+      toast.error(err.response?.data?.message || 'Failed to load donator accounts');
     } finally {
       setLoading(false);
     }
@@ -44,28 +47,68 @@ export default function UserAccounts() {
 
   function openEditModal(user) {
     setEditingUser(user);
-    setEditForm({ mobile: user.mobile, newPassword: '' });
+    setEditForm({
+      name: user.name || '',
+      mobile: user.mobile || '',
+      city: user.city || '',
+      newPassword: '',
+    });
+    setMobileError('');
+    setPasswordErrors([]);
   }
 
   function closeEditModal() {
     setEditingUser(null);
-    setEditForm({ mobile: '', newPassword: '' });
+    setEditForm({ name: '', mobile: '', city: '', newPassword: '' });
+    setMobileError('');
+    setPasswordErrors([]);
+  }
+
+  function handleMobileInput(val) {
+    setEditForm((prev) => ({ ...prev, mobile: val }));
+    if (/[^0-9]/.test(val)) {
+      setMobileError('Only digits (0-9) allowed. No characters, spaces, or symbols.');
+    } else if (val.length > 0 && val.length !== 10) {
+      setMobileError('Mobile number must be exactly 10 digits');
+    } else {
+      setMobileError('');
+    }
   }
 
   async function handleSaveEdit(e) {
     e.preventDefault();
     if (!editingUser) return;
+
+    // Validate mobile
+    const mErr = validateMobile(editForm.mobile);
+    if (mErr) {
+      setMobileError(mErr);
+      return;
+    }
+
+    // Validate password if provided
+    let pErrors = [];
+    if (editForm.newPassword) {
+      pErrors = validatePassword(editForm.newPassword);
+      if (pErrors.length > 0) {
+        setPasswordErrors(pErrors);
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       await api.patch(`/api/admin/users/${editingUser.id}`, {
-        mobile: editForm.mobile,
+        name: editForm.name.trim(),
+        mobile: editForm.mobile.trim(),
+        city: editForm.city.trim(),
         newPassword: editForm.newPassword || undefined,
       });
-      toast.success(`Credentials updated for "${editingUser.name}"`);
+      toast.success(`Donator details updated for "${editForm.name}"`);
       closeEditModal();
       await loadUsers();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update user credentials');
+      toast.error(err.response?.data?.message || 'Failed to update donator credentials');
     } finally {
       setIsSaving(false);
     }
@@ -84,11 +127,11 @@ export default function UserAccounts() {
     setIsDeleting(true);
     try {
       await api.delete(`/api/admin/users/${deletingUser.id}`);
-      toast.success(`User "${deletingUser.name}" has been removed`);
+      toast.success(`Donator "${deletingUser.name}" has been removed`);
       closeDeleteModal();
       await loadUsers();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete user');
+      toast.error(err.response?.data?.message || 'Failed to delete donator');
     } finally {
       setIsDeleting(false);
     }
@@ -96,11 +139,13 @@ export default function UserAccounts() {
 
   const filteredUsers = (users || []).filter((u) => {
     const term = search.toLowerCase();
-    return (
+    const matchesSearch =
       u.name?.toLowerCase().includes(term) ||
       u.mobile?.toLowerCase().includes(term) ||
-      u.city?.toLowerCase().includes(term)
-    );
+      u.city?.toLowerCase().includes(term);
+
+    const matchesCity = !selectedCity || u.city?.toLowerCase() === selectedCity.toLowerCase();
+    return matchesSearch && matchesCity;
   });
 
   return (
@@ -110,34 +155,52 @@ export default function UserAccounts() {
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
           <div>
-            <div className="admin-breadcrumb">Admin / User Accounts</div>
+            <div className="admin-breadcrumb">Admin / Donators</div>
             <h1 className="admin-page-title">
-              User Accounts {users !== null && `(${users.length} total)`}
+              Donator Accounts {users !== null && `(${users.length} total)`}
             </h1>
           </div>
-
-
         </div>
 
         <section className="admin-card-panel">
-          <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-            <div style={{ maxWidth: '340px', width: '100%', position: 'relative' }}>
-              <Search
-                size={16}
-                color="var(--color-text-muted)"
-                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-              />
-              <input
-                type="text"
-                className="admin-form-input"
-                style={{ paddingLeft: '2.4rem' }}
-                placeholder="Search by name, phone, city..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+          <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+            <div className="d-flex align-items-center gap-2 flex-wrap" style={{ flex: '1 1 340px' }}>
+              <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '340px' }}>
+                <Search
+                  size={16}
+                  color="var(--color-text-muted)"
+                  style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+                />
+                <input
+                  type="text"
+                  className="admin-form-input"
+                  style={{ paddingLeft: '2.4rem' }}
+                  placeholder="Search by name, phone, city..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+
+              {/* City Filter Dropdown */}
+              <div style={{ position: 'relative', minWidth: '180px' }}>
+                <select
+                  className="admin-form-input"
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <option value="">All Cities</option>
+                  {CITIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+
             <span className="text-muted" style={{ fontSize: 'var(--text-small)' }}>
-              Showing <strong>{filteredUsers.length}</strong> of {users ? users.length : 0} registered accounts
+              Showing <strong>{filteredUsers.length}</strong> of {users ? users.length : 0} donators
             </span>
           </div>
 
@@ -160,82 +223,54 @@ export default function UserAccounts() {
                     <th>Name</th>
                     <th>Mobile</th>
                     <th>City</th>
-                    <th>NGO Status</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="text-center py-4 text-muted">
-                        No matching user accounts found.
+                      <td colSpan="4" className="text-center py-4 text-muted">
+                        No matching donator accounts found.
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((user) => {
-                      const isApproved = user.ngoStatus === 'approved';
-                      const isPending = user.ngoStatus === 'pending';
-                      const isRejected = user.ngoStatus === 'rejected';
-
-                      const statusClass = isApproved
-                        ? 'approved'
-                        : isPending
-                        ? 'pending'
-                        : isRejected
-                        ? 'rejected'
-                        : 'none';
-
-                      return (
-                        <tr key={user.id}>
-                          <td>
-                            <strong>{user.name}</strong>
-                            <div className="text-muted small">
-                              Joined {new Date(user.createdAt || Date.now()).toLocaleDateString([], { dateStyle: 'medium' })}
-                            </div>
-                          </td>
-                          <td>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{user.mobile}</span>
-                          </td>
-                          <td>
-                            <span>{user.city}</span>
-                          </td>
-                          <td>
-                            <span className={`badge-status ${statusClass} d-inline-flex align-items-center gap-1`}>
-                              {isApproved && <BadgeCheck size={14} />}
-                              {isPending && <Clock size={14} />}
-                              {isRejected && <XCircle size={14} />}
-                              <span>
-                                {isApproved
-                                  ? 'Verified NGO'
-                                  : isPending
-                                  ? 'Pending'
-                                  : isRejected
-                                  ? 'Declined'
-                                  : 'Individual'}
-                              </span>
-                            </span>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: '8px' }}>
-                              <button
-                                className="btn-admin-outline d-inline-flex align-items-center gap-1"
-                                onClick={() => openEditModal(user)}
-                              >
-                                <Pencil size={14} />
-                                <span>Edit</span>
-                              </button>
-                              <button
-                                className="btn-admin-danger d-inline-flex align-items-center gap-1"
-                                onClick={() => openDeleteModal(user)}
-                              >
-                                <Trash2 size={14} />
-                                <span>Delete</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                    filteredUsers.map((user) => (
+                      <tr key={user.id}>
+                        <td>
+                          <strong>{user.name}</strong>
+                          <div className="text-muted small">
+                            Joined {new Date(user.createdAt || Date.now()).toLocaleDateString([], { dateStyle: 'medium' })}
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{user.mobile}</span>
+                        </td>
+                        <td>
+                          <span className="d-inline-flex align-items-center gap-1">
+                            <MapPin size={13} color="var(--color-text-muted)" />
+                            {user.city}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: '8px' }}>
+                            <button
+                              className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                              onClick={() => openEditModal(user)}
+                            >
+                              <Pencil size={14} />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              className="btn-admin-danger d-inline-flex align-items-center gap-1"
+                              onClick={() => openDeleteModal(user)}
+                            >
+                              <Trash2 size={14} />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -273,12 +308,26 @@ export default function UserAccounts() {
               <div className="d-flex align-items-center gap-2 mb-1">
                 <Pencil size={18} color="var(--color-primary)" />
                 <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
-                  Edit Credentials
+                  Edit Donator Details
                 </h3>
               </div>
               <p className="text-muted small mb-4">Editing account for {editingUser.name}</p>
 
               <form onSubmit={handleSaveEdit}>
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="edit-name">
+                    Full Name
+                  </label>
+                  <input
+                    id="edit-name"
+                    type="text"
+                    className="admin-form-input"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+
                 <div className="mb-3">
                   <label className="form-label" htmlFor="edit-mobile">
                     Mobile Number
@@ -288,9 +337,36 @@ export default function UserAccounts() {
                     type="text"
                     className="admin-form-input"
                     value={editForm.mobile}
-                    onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
+                    onChange={(e) => handleMobileInput(e.target.value)}
+                    placeholder="10-digit mobile number"
                     required
                   />
+                  {mobileError && (
+                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                      <AlertTriangle size={13} />
+                      <span>{mobileError}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="edit-city">
+                    City
+                  </label>
+                  <select
+                    id="edit-city"
+                    className="admin-form-input"
+                    value={editForm.city}
+                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                    required
+                  >
+                    <option value="">Select City...</option>
+                    {Array.from(new Set([...CITIES, editForm.city].filter(Boolean))).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="mb-4">
@@ -301,11 +377,24 @@ export default function UserAccounts() {
                     id="edit-new-pass"
                     type="password"
                     className="admin-form-input"
-                    placeholder="Enter min. 6 characters..."
+                    placeholder="Enter 6-30 characters (letters, numbers, @)..."
                     value={editForm.newPassword}
-                    onChange={(e) => setEditForm({ ...editForm, newPassword: e.target.value })}
+                    onChange={(e) => {
+                      setEditForm({ ...editForm, newPassword: e.target.value });
+                      setPasswordErrors([]);
+                    }}
                     onPaste={(e) => e.preventDefault()}
                   />
+                  {passwordErrors.length > 0 && (
+                    <div className="mt-1 d-flex flex-column gap-1">
+                      {passwordErrors.map((err, idx) => (
+                        <span key={idx} className="text-danger small d-flex align-items-center gap-1">
+                          <AlertTriangle size={12} />
+                          {err}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="d-flex justify-content-end gap-2">
@@ -351,11 +440,11 @@ export default function UserAccounts() {
               <div className="d-flex align-items-center gap-2 mb-2" style={{ color: 'var(--color-danger)' }}>
                 <AlertTriangle size={20} />
                 <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
-                  Delete User Account
+                  Delete Donator Account
                 </h3>
               </div>
               <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
-                Are you sure you want to delete user <strong>"{deletingUser.name}"</strong>? This will remove all their profile data and associated food donation listings. <strong>This action cannot be undone.</strong>
+                Are you sure you want to delete donator <strong>"{deletingUser.name}"</strong>? This will remove all their profile data and associated food donation listings. <strong>This action cannot be undone.</strong>
               </p>
 
               <div className="d-flex justify-content-end gap-2">

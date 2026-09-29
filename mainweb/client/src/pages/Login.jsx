@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Leaf, Phone, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { validateMobile } from '../utils/validation';
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -20,7 +21,11 @@ export default function Login() {
 
   function handleMobileChange(val) {
     setMobile(val);
-    if (fieldErrors.mobile) {
+    if (/[^0-9]/.test(val)) {
+      setFieldErrors((prev) => ({ ...prev, mobile: 'Only numbers (0-9) are allowed. No characters, symbols, or spaces.' }));
+    } else if (val.length > 0 && val.length !== 10) {
+      setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number must be exactly 10 digits' }));
+    } else {
       setFieldErrors((prev) => ({ ...prev, mobile: '' }));
     }
   }
@@ -36,8 +41,9 @@ export default function Login() {
     e.preventDefault();
 
     const errors = {};
-    if (!mobile.trim()) {
-      errors.mobile = 'Please enter your mobile number';
+    const mobileErr = validateMobile(mobile);
+    if (mobileErr) {
+      errors.mobile = mobileErr;
     }
     if (!password) {
       errors.password = 'Please enter your password';

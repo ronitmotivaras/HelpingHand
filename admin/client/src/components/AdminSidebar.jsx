@@ -49,13 +49,13 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
             </li>
             <li>
               <button
-                className={`admin-nav-link ${currentPath === '/ngo-verification' ? 'active' : ''}`}
-                onClick={() => navigate('/ngo-verification')}
+                className={`admin-nav-link ${currentPath === '/ngo-list' || currentPath === '/ngo-verification' ? 'active' : ''}`}
+                onClick={() => navigate('/ngo-list')}
               >
                 <span className="nav-icon">
                   <BadgeCheck size={16} strokeWidth={2} />
                 </span>
-                <span className="nav-label">NGO Verification</span>
+                <span className="nav-label">NGO List</span>
                 {typeof pendingCount === 'number' && pendingCount > 0 && (
                   <span className="nav-count-badge">{pendingCount}</span>
                 )}
@@ -63,13 +63,13 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
             </li>
             <li>
               <button
-                className={`admin-nav-link ${currentPath === '/user-accounts' ? 'active' : ''}`}
-                onClick={() => navigate('/user-accounts')}
+                className={`admin-nav-link ${currentPath === '/donators' || currentPath === '/user-accounts' ? 'active' : ''}`}
+                onClick={() => navigate('/donators')}
               >
                 <span className="nav-icon">
                   <Users size={16} strokeWidth={2} />
                 </span>
-                <span className="nav-label">User Accounts</span>
+                <span className="nav-label">Donators</span>
                 {typeof usersCount === 'number' && usersCount > 0 && (
                   <span className="nav-count-badge">{usersCount}</span>
                 )}

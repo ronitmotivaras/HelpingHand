@@ -6,33 +6,41 @@ import {
   XCircle,
   MapPin,
   Phone,
+  User,
   AlertTriangle,
+  Search,
+  BadgeCheck,
+  Clock,
 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import api from '../api/axiosInstance';
+import { CITIES } from '../constants/cities';
 
 export default function NgoVerification() {
-  const [requests, setRequests] = useState(null);
+  const [ngos, setNgos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [cityFilter, setCityFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   // Reject confirmation modal
   const [confirmReject, setConfirmReject] = useState(null);
 
-  async function loadRequests() {
+  async function loadNgos() {
     setLoading(true);
     try {
       const res = await api.get('/api/admin/ngo-requests');
-      setRequests(res.data);
+      setNgos(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load NGO verification requests');
+      toast.error(err.response?.data?.message || 'Failed to load NGO list');
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadRequests();
+    loadNgos();
   }, []);
 
   async function handleApprove(id, ngoName) {
@@ -40,7 +48,7 @@ export default function NgoVerification() {
     try {
       await api.patch(`/api/admin/ngo-requests/${id}/approve`);
       toast.success(`"${ngoName || 'NGO'}" approved as a verified partner`);
-      await loadRequests();
+      await loadNgos();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to approve NGO request');
     } finally {
@@ -59,42 +67,141 @@ export default function NgoVerification() {
     setConfirmReject(null);
     try {
       await api.patch(`/api/admin/ngo-requests/${id}/reject`);
-      toast.success(`Verification request for "${name}" was declined`);
-      await loadRequests();
+      toast.success(`Verification status for "${name}" was updated`);
+      await loadNgos();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to decline NGO request');
+      toast.error(err.response?.data?.message || 'Failed to update NGO status');
     } finally {
       setProcessingId(null);
     }
   }
 
+  const pendingCount = ngos ? ngos.filter((n) => n.ngoStatus === 'pending').length : 0;
+  const approvedCount = ngos ? ngos.filter((n) => n.ngoStatus === 'approved').length : 0;
+
+  const filteredNgos = (ngos || []).filter((ngo) => {
+    // Status filter
+    if (statusFilter !== 'all' && ngo.ngoStatus !== statusFilter) {
+      return false;
+    }
+
+    // City filter
+    const ngoCity = ngo.ngoDetails?.city || ngo.city || '';
+    if (cityFilter && ngoCity.toLowerCase() !== cityFilter.toLowerCase()) {
+      return false;
+    }
+
+    // Search term
+    if (search.trim()) {
+      const term = search.toLowerCase();
+      const ngoName = (ngo.ngoDetails?.ngoName || ngo.ngoDetails?.name || ngo.name || '').toLowerCase();
+      const coordinator = (ngo.ngoDetails?.coordinatorName || ngo.name || '').toLowerCase();
+      const contact = (ngo.ngoDetails?.contactNum || ngo.mobile || '').toLowerCase();
+      const address = (ngo.ngoDetails?.address || '').toLowerCase();
+      const city = ngoCity.toLowerCase();
+
+      return (
+        ngoName.includes(term) ||
+        coordinator.includes(term) ||
+        contact.includes(term) ||
+        address.includes(term) ||
+        city.includes(term)
+      );
+    }
+
+    return true;
+  });
+
   return (
     <div className="admin-layout">
-      <AdminSidebar pendingCount={requests ? requests.length : undefined} />
+      <AdminSidebar pendingCount={pendingCount} />
 
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
           <div>
-            <div className="admin-breadcrumb">Admin / NGO Verification</div>
+            <div className="admin-breadcrumb">Admin / NGO List</div>
             <h1 className="admin-page-title">
-              NGO Verification Requests {requests !== null && `(${requests.length} pending)`}
+              Registered NGOs {ngos !== null && `(${ngos.length} total)`}
             </h1>
           </div>
-
-
         </div>
 
         <section className="admin-card-panel">
-          <div className="panel-header">
-            <h2 className="panel-title">
-              <span>Pending Applications</span>
-              {requests !== null && <span className="count-chip">{requests.length}</span>}
-            </h2>
+          {/* Header Controls: Search, City Dropdown, Status Filters */}
+          <div className="d-flex flex-column gap-3 mb-4">
+            <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+              <div className="d-flex align-items-center gap-2 flex-wrap" style={{ flex: '1 1 340px' }}>
+                <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '340px' }}>
+                  <Search
+                    size={16}
+                    color="var(--color-text-muted)"
+                    style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+                  />
+                  <input
+                    type="text"
+                    className="admin-form-input"
+                    style={{ paddingLeft: '2.4rem' }}
+                    placeholder="Search by NGO name, coordinator, phone..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+
+                {/* City Dropdown Filter */}
+                <div style={{ minWidth: '180px' }}>
+                  <select
+                    className="admin-form-input"
+                    value={cityFilter}
+                    onChange={(e) => setCityFilter(e.target.value)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <option value="">All Cities</option>
+                    {CITIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Status Tabs */}
+              <div className="filter-button-group">
+                <button
+                  className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All ({ngos ? ngos.length : 0})
+                </button>
+                <button
+                  className={`filter-btn ${statusFilter === 'pending' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('pending')}
+                >
+                  Pending ({pendingCount})
+                </button>
+                <button
+                  className={`filter-btn ${statusFilter === 'approved' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('approved')}
+                >
+                  Verified ({approvedCount})
+                </button>
+                <button
+                  className={`filter-btn ${statusFilter === 'rejected' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('rejected')}
+                >
+                  Declined
+                </button>
+              </div>
+            </div>
+
+            <span className="text-muted" style={{ fontSize: 'var(--text-small)' }}>
+              Showing <strong>{filteredNgos.length}</strong> of {ngos ? ngos.length : 0} NGOs
+            </span>
           </div>
 
-          {loading && requests === null ? (
+          {loading && ngos === null ? (
             <div className="p-3">
-              {[1, 2].map((i) => (
+              {[1, 2, 3].map((i) => (
                 <div key={i} className="mb-3 p-3 border rounded">
                   <div className="skeleton-box mb-2" style={{ width: '40%', height: '22px' }} />
                   <div className="skeleton-box mb-2" style={{ width: '70%', height: '16px' }} />
@@ -102,29 +209,41 @@ export default function NgoVerification() {
                 </div>
               ))}
             </div>
-          ) : !requests || requests.length === 0 ? (
+          ) : filteredNgos.length === 0 ? (
             <div className="admin-empty-state">
               <div className="empty-icon mb-2">
                 <Inbox size={48} color="var(--color-text-muted)" strokeWidth={1.5} />
               </div>
-              <p className="fw-semibold mb-1">No pending NGO registration requests right now.</p>
+              <p className="fw-semibold mb-1">No matching NGOs found.</p>
               <span className="text-muted small">
-                When registered community food relief organizations submit verification requests, they will appear here.
+                When relief organizations and charities register, they will be listed here.
               </span>
             </div>
           ) : (
             <div className="d-flex flex-column gap-3">
-              {requests.map((req) => {
-                const isProcessing = processingId === req.id;
-                const ngoName = req.ngoDetails?.ngoName || req.ngoDetails?.name || 'Unnamed NGO';
-                const city = req.ngoDetails?.city || req.city || '—';
-                const address = req.ngoDetails?.address || '—';
-                const contactNum = req.ngoDetails?.contactNum || req.ngoDetails?.contactNumber || req.mobile || '—';
-                const coordinatorName = req.ngoDetails?.coordinatorName || req.name || '—';
+              {filteredNgos.map((ngo) => {
+                const isProcessing = processingId === ngo.id;
+                const ngoName = ngo.ngoDetails?.ngoName || ngo.ngoDetails?.name || ngo.name || 'Unnamed NGO';
+                const city = ngo.ngoDetails?.city || ngo.city || '—';
+                const address = ngo.ngoDetails?.address || '—';
+                const contactNum = ngo.ngoDetails?.contactNum || ngo.ngoDetails?.contactNumber || ngo.mobile || '—';
+                const coordinatorName = ngo.ngoDetails?.coordinatorName || ngo.name || '—';
+
+                const isApproved = ngo.ngoStatus === 'approved';
+                const isPending = ngo.ngoStatus === 'pending';
+                const isRejected = ngo.ngoStatus === 'rejected';
+
+                const statusClass = isApproved
+                  ? 'approved'
+                  : isPending
+                  ? 'pending'
+                  : isRejected
+                  ? 'rejected'
+                  : 'none';
 
                 return (
                   <div
-                    key={req.id}
+                    key={ngo.id}
                     className="p-4"
                     style={{
                       background: 'var(--color-surface)',
@@ -135,7 +254,7 @@ export default function NgoVerification() {
                   >
                     <div className="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                       <div>
-                        <div className="d-flex align-items-center gap-2">
+                        <div className="d-flex align-items-center gap-2 flex-wrap">
                           <h3
                             style={{
                               fontSize: '18px',
@@ -146,28 +265,67 @@ export default function NgoVerification() {
                           >
                             {ngoName}
                           </h3>
-                          <span className="badge-status pending">Pending Review</span>
+                          <span className={`badge-status ${statusClass} d-inline-flex align-items-center gap-1`}>
+                            {isApproved && <BadgeCheck size={14} />}
+                            {isPending && <Clock size={14} />}
+                            {isRejected && <XCircle size={14} />}
+                            <span>
+                              {isApproved
+                                ? 'Verified NGO'
+                                : isPending
+                                ? 'Pending Review'
+                                : 'Declined'}
+                            </span>
+                          </span>
                         </div>
-                        <div className="text-muted small mt-1">Coordinator: {coordinatorName} &bull; Contact: {contactNum}</div>
+                        <div className="text-muted small mt-1">
+                          Coordinator: <strong>{coordinatorName}</strong> &bull; Contact: <strong>{contactNum}</strong>
+                        </div>
                       </div>
 
                       <div className="d-flex gap-2">
-                        <button
-                          className="btn-admin-primary d-inline-flex align-items-center gap-1"
-                          disabled={isProcessing}
-                          onClick={() => handleApprove(req.id, ngoName)}
-                        >
-                          <CheckCircle2 size={16} strokeWidth={2} />
-                          <span>{isProcessing ? 'Processing...' : 'Approve'}</span>
-                        </button>
-                        <button
-                          className="btn-admin-danger d-inline-flex align-items-center gap-1"
-                          disabled={isProcessing}
-                          onClick={() => promptReject(req.id, ngoName)}
-                        >
-                          <XCircle size={16} strokeWidth={2} />
-                          <span>{isProcessing ? 'Processing...' : 'Reject'}</span>
-                        </button>
+                        {isPending && (
+                          <>
+                            <button
+                              className="btn-admin-primary d-inline-flex align-items-center gap-1"
+                              disabled={isProcessing}
+                              onClick={() => handleApprove(ngo.id, ngoName)}
+                            >
+                              <CheckCircle2 size={16} strokeWidth={2} />
+                              <span>{isProcessing ? 'Processing...' : 'Approve'}</span>
+                            </button>
+                            <button
+                              className="btn-admin-danger d-inline-flex align-items-center gap-1"
+                              disabled={isProcessing}
+                              onClick={() => promptReject(ngo.id, ngoName)}
+                            >
+                              <XCircle size={16} strokeWidth={2} />
+                              <span>{isProcessing ? 'Processing...' : 'Reject'}</span>
+                            </button>
+                          </>
+                        )}
+                        {isApproved && (
+                          <button
+                            className="btn-admin-danger d-inline-flex align-items-center gap-1"
+                            disabled={isProcessing}
+                            onClick={() => promptReject(ngo.id, ngoName)}
+                            title="Revoke verification status"
+                          >
+                            <XCircle size={15} />
+                            <span>Revoke</span>
+                          </button>
+                        )}
+                        {isRejected && (
+                          <button
+                            className="btn-admin-primary d-inline-flex align-items-center gap-1"
+                            disabled={isProcessing}
+                            onClick={() => handleApprove(ngo.id, ngoName)}
+                            title="Re-approve NGO"
+                          >
+                            <CheckCircle2 size={15} />
+                            <span>Re-Approve</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -188,11 +346,13 @@ export default function NgoVerification() {
                         <div className="text-muted small d-flex align-items-center gap-1">
                           <Phone size={13} /> Contact Number
                         </div>
-                        <div className="fw-semibold mt-1" style={{ fontFamily: 'monospace' }}>{contactNum}</div>
+                        <div className="fw-semibold mt-1" style={{ fontFamily: 'monospace' }}>
+                          {contactNum}
+                        </div>
                       </div>
                       <div className="col-md-3">
                         <div className="text-muted small d-flex align-items-center gap-1">
-                          <MapPin size={13} /> Coordinator
+                          <User size={13} /> Coordinator Name
                         </div>
                         <div className="fw-semibold mt-1">{coordinatorName}</div>
                       </div>
@@ -238,7 +398,7 @@ export default function NgoVerification() {
                 </h3>
               </div>
               <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
-                Are you sure you want to decline the verification application for <strong>"{confirmReject.name}"</strong>? This will notify the applicant and mark the review as declined.
+                Are you sure you want to decline the verification application for <strong>"{confirmReject.name}"</strong>? This will update the status of this NGO.
               </p>
 
               <div className="d-flex justify-content-end gap-2">
@@ -254,7 +414,7 @@ export default function NgoVerification() {
                   className="btn-admin-danger"
                   onClick={confirmRejectAction}
                 >
-                  Yes, Decline Request
+                  Yes, Decline
                 </button>
               </div>
             </div>

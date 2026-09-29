@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, SlidersHorizontal, Inbox } from 'lucide-react';
+import { Plus, SlidersHorizontal, Inbox, MapPin } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import FoodCard from '../components/FoodCard';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
+import { CITIES } from '../constants/cities';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [selectedCity, setSelectedCity] = useState(user?.city || 'Ahmedabad');
   const [foodType, setFoodType] = useState('all');
   const [donations, setDonations] = useState([]);
   const [error, setError] = useState('');
@@ -19,7 +21,7 @@ export default function Dashboard() {
       setLoading(true);
       setError('');
       try {
-        const params = { city: user.city };
+        const params = { city: selectedCity };
         if (foodType !== 'all') {
           params.foodType = foodType;
         }
@@ -35,7 +37,10 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [foodType, user.city]);
+  }, [foodType, selectedCity]);
+
+  // Combined list of cities ensuring user's city is included
+  const cityOptions = Array.from(new Set([...CITIES, ...(user?.city ? [user.city] : [])]));
 
   return (
     <>
@@ -44,13 +49,38 @@ export default function Dashboard() {
         {/* Premium gradient page header - hero band keeps only heading and subtext */}
         <div className="hh-page-header">
           <div>
-            <h1>Available Food in {user.city}</h1>
+            <h1>Available Food in {selectedCity}</h1>
             <p>Surplus food listings available for pickup near you</p>
           </div>
         </div>
 
-        {/* Filter bar */}
-        <div className="d-flex align-items-center gap-3 mb-4" style={{ flexWrap: 'wrap' }}>
+        {/* Filter bar with City Dropdown and Diet Type */}
+        <div className="d-flex align-items-center gap-3 mb-4 flex-wrap">
+          {/* City dropdown selector */}
+          <div className="d-flex align-items-center gap-2" style={{ position: 'relative' }}>
+            <MapPin size={16} color="var(--color-primary)" />
+            <select
+              id="dashboard-city-select"
+              className="form-select"
+              style={{
+                minWidth: '170px',
+                paddingLeft: '0.8rem',
+                fontSize: 'var(--text-small)',
+                fontWeight: 600,
+                borderColor: 'var(--color-border)',
+                cursor: 'pointer',
+              }}
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+            >
+              {cityOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="d-flex align-items-center gap-2">
             <SlidersHorizontal size={15} color="var(--color-text-muted)" />
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontWeight: 600 }}>Filter:</span>
@@ -115,7 +145,7 @@ export default function Dashboard() {
             <div className="mb-3">
               <Inbox size={56} color="var(--color-text-muted)" strokeWidth={1.5} />
             </div>
-            <h3 className="section-title mb-2">No food available in {user.city} right now</h3>
+            <h3 className="section-title mb-2">No food available in {selectedCity} right now</h3>
             <p className="food-card-meta mb-4">
               Check back soon, or be the first to share extra food with your community.
             </p>

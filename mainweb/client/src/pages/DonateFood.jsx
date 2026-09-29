@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
+import { CITIES } from '../constants/cities';
+import { validateMobile } from '../utils/validation';
 
 export default function DonateFood() {
   const { user } = useAuth();
@@ -15,20 +17,48 @@ export default function DonateFood() {
     foodType: 'veg',
     contactName: user?.name || '',
     phone: user?.mobile || '',
+    city: user?.city || 'Ahmedabad',
     availableUpto: '',
     address: '',
   });
+  const [phoneError, setPhoneError] = useState('');
   const [loading, setLoading] = useState(false);
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function handlePhoneChange(val) {
+    update('phone', val);
+    if (/[^0-9]/.test(val)) {
+      setPhoneError('Only numbers (0-9) are allowed. No characters, symbols, or spaces.');
+    } else if (val.length > 0 && val.length !== 10) {
+      setPhoneError('Mobile number must be exactly 10 digits');
+    } else {
+      setPhoneError('');
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
+
+    const mError = validateMobile(form.phone);
+    if (mError) {
+      setPhoneError(mError);
+      return;
+    }
+    if (!form.city.trim()) {
+      toast.error('Please select a city');
+      return;
+    }
+
     setLoading(true);
     try {
-      await api.post('/donations', form);
+      await api.post('/donations', {
+        ...form,
+        phone: form.phone.trim(),
+        city: form.city.trim(),
+      });
       toast.success('Food donation listing published successfully!');
       navigate('/');
     } catch (err) {
@@ -37,6 +67,8 @@ export default function DonateFood() {
       setLoading(false);
     }
   }
+
+  const cityOptions = Array.from(new Set([...CITIES, ...(user?.city ? [user.city] : [])]));
 
   return (
     <>
@@ -54,7 +86,7 @@ export default function DonateFood() {
         <div className="hh-card">
           <h1 className="section-title mb-1">List Surplus Food</h1>
           <p className="food-card-meta mb-4">
-            Helping food reach someone nearby. Location: <strong>{user?.city}</strong>
+            Helping food reach someone nearby. Location: <strong>{form.city}</strong>
           </p>
 
           <form onSubmit={handleSubmit}>
@@ -114,23 +146,50 @@ export default function DonateFood() {
                 <input
                   id="contact-phone"
                   className="form-control"
+                  placeholder="10-digit mobile number"
                   value={form.phone}
-                  onChange={(e) => update('phone', e.target.value)}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
                   required
                 />
+                {phoneError && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{phoneError}</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="form-group mb-3">
-              <label className="form-label" htmlFor="available-upto">Available Until (Expiry / Pickup window)</label>
-              <input
-                id="available-upto"
-                type="datetime-local"
-                className="form-control"
-                value={form.availableUpto}
-                onChange={(e) => update('availableUpto', e.target.value)}
-                required
-              />
+            <div className="row g-3 mb-3">
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="donation-city">City</label>
+                <select
+                  id="donation-city"
+                  className="form-select"
+                  value={form.city}
+                  onChange={(e) => update('city', e.target.value)}
+                  required
+                >
+                  <option value="">Select City...</option>
+                  {cityOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="available-upto">Available Until (Expiry / Pickup window)</label>
+                <input
+                  id="available-upto"
+                  type="datetime-local"
+                  className="form-control"
+                  value={form.availableUpto}
+                  onChange={(e) => update('availableUpto', e.target.value)}
+                  required
+                />
+              </div>
             </div>
 
             <div className="form-group mb-4">
@@ -159,8 +218,8 @@ export default function DonateFood() {
                   </>
                 ) : (
                   <>
-                    <Plus size={18} strokeWidth={2.5} />
-                    <span>Post Food Listing</span>
+                    <Plus size={18} />
+                    <span>Publish Food Listing</span>
                   </>
                 )}
               </button>

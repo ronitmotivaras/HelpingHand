@@ -42,6 +42,10 @@ async function register(req, res) {
         return res.status(400).json({ message: 'All NGO fields are required' });
       }
 
+      if (!/^\d{10}$/.test(finalContactNum)) {
+        return res.status(400).json({ message: 'Contact number must be exactly 10 digits (0-9 only)' });
+      }
+
       if (password !== confirmPassword) {
         return res.status(400).json({ message: 'Passwords do not match' });
       }
@@ -89,6 +93,11 @@ async function register(req, res) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
+    const trimmedMobile = String(mobile).trim();
+    if (!/^\d{10}$/.test(trimmedMobile)) {
+      return res.status(400).json({ message: 'Mobile number must be exactly 10 digits (0-9 only)' });
+    }
+
     if (password !== confirmPassword) {
       return res.status(400).json({ message: 'Passwords do not match' });
     }
@@ -103,7 +112,7 @@ async function register(req, res) {
       return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
     }
 
-    const existing = await User.findOne({ mobile: String(mobile).trim() });
+    const existing = await User.findOne({ mobile: trimmedMobile });
     if (existing) {
       return res.status(409).json({ message: 'Mobile number is already registered' });
     }
@@ -111,7 +120,7 @@ async function register(req, res) {
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({
       name: name.trim(),
-      mobile: String(mobile).trim(),
+      mobile: trimmedMobile,
       passwordHash,
       city: city.trim(),
       ngoStatus: 'none',
@@ -137,7 +146,12 @@ async function login(req, res) {
       return res.status(400).json({ message: 'Mobile number and password are required' });
     }
 
-    const user = await User.findOne({ mobile: String(mobile).trim() });
+    const cleanMobile = String(mobile).trim();
+    if (!/^\d{10}$/.test(cleanMobile)) {
+      return res.status(400).json({ message: 'Mobile number must be exactly 10 digits (0-9 only)' });
+    }
+
+    const user = await User.findOne({ mobile: cleanMobile });
     if (!user) {
       return res.status(401).json({ message: 'Incorrect mobile number or password' });
     }

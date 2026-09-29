@@ -70,16 +70,23 @@ async function createDonation(req, res) {
       return res.status(400).json({ message: 'Food type must be veg or nonveg' });
     }
 
+    const cleanPhone = String(phone).trim();
+    if (!/^\d{10}$/.test(cleanPhone)) {
+      return res.status(400).json({ message: 'Contact phone must be exactly 10 digits (0-9 only)' });
+    }
+
+    const donationCity = (req.body.city || req.user.city || '').trim();
+
     const donation = await FoodDonation.create({
       donorId: req.user._id,
       donorName: contactName.trim(),
-      donorPhone: String(phone).trim(),
+      donorPhone: cleanPhone,
       foodName: foodName.trim(),
       quantity: String(quantity).trim(),
       foodType,
       availableUpto: new Date(availableUpto),
       address: address.trim(),
-      city: req.user.city,
+      city: donationCity,
       status: 'available',
     });
 

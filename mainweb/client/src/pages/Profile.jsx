@@ -20,6 +20,8 @@ import {
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
+import { validateMobile } from '../utils/validation';
+import { CITIES } from '../constants/cities';
 
 export default function Profile() {
   const { user, logout, refreshProfile } = useAuth();
@@ -29,6 +31,7 @@ export default function Profile() {
   const [editName, setEditName] = useState(user?.name || '');
   const [editMobile, setEditMobile] = useState(user?.mobile || '');
   const [editCity, setEditCity] = useState(user?.city || '');
+  const [mobileError, setMobileError] = useState('');
   const [saving, setSaving] = useState(false);
 
   function handleLogout() {
@@ -41,6 +44,7 @@ export default function Profile() {
     setEditName(user?.name || '');
     setEditMobile(user?.mobile || '');
     setEditCity(user?.city || '');
+    setMobileError('');
     setIsEditing(true);
   }
 
@@ -49,6 +53,18 @@ export default function Profile() {
     setEditName(user?.name || '');
     setEditMobile(user?.mobile || '');
     setEditCity(user?.city || '');
+    setMobileError('');
+  }
+
+  function handleMobileChange(val) {
+    setEditMobile(val);
+    if (/[^0-9]/.test(val)) {
+      setMobileError('Only numbers (0-9) are allowed. No characters, symbols, or spaces.');
+    } else if (val.length > 0 && val.length !== 10) {
+      setMobileError('Mobile number must be exactly 10 digits');
+    } else {
+      setMobileError('');
+    }
   }
 
   async function saveEditing() {
@@ -56,12 +72,14 @@ export default function Profile() {
       toast.error('Name cannot be empty');
       return;
     }
-    if (!editMobile.trim()) {
-      toast.error('Mobile number cannot be empty');
+    const mErr = validateMobile(editMobile);
+    if (mErr) {
+      setMobileError(mErr);
+      toast.error(mErr);
       return;
     }
     if (!editCity.trim()) {
-      toast.error('City cannot be empty');
+      toast.error('Please select a city');
       return;
     }
 
@@ -185,14 +203,19 @@ export default function Profile() {
               <span>Registered Phone</span>
             </span>
             {isEditing ? (
-              <div style={{ maxWidth: '220px', width: '100%' }}>
+              <div style={{ maxWidth: '240px', width: '100%' }}>
                 <input
                   className="form-control"
                   style={{ padding: '4px 10px', fontSize: 'var(--text-sm)', fontFamily: 'monospace' }}
                   value={editMobile}
-                  onChange={(e) => setEditMobile(e.target.value)}
-                  placeholder="Mobile number"
+                  onChange={(e) => handleMobileChange(e.target.value)}
+                  placeholder="10-digit mobile"
                 />
+                {mobileError && (
+                  <div className="text-danger small mt-1" style={{ fontSize: '11px', lineHeight: 1.2 }}>
+                    {mobileError}
+                  </div>
+                )}
               </div>
             ) : (
               <strong style={{ fontFamily: 'monospace' }}>{user?.mobile}</strong>
@@ -207,13 +230,19 @@ export default function Profile() {
             </span>
             {isEditing ? (
               <div style={{ maxWidth: '220px', width: '100%' }}>
-                <input
+                <select
                   className="form-control"
                   style={{ padding: '4px 10px', fontSize: 'var(--text-sm)' }}
                   value={editCity}
                   onChange={(e) => setEditCity(e.target.value)}
-                  placeholder="Primary city"
-                />
+                >
+                  <option value="">Select a city...</option>
+                  {Array.from(new Set([...CITIES, ...(user?.city ? [user.city] : [])])).map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
             ) : (
               <strong>{user?.city}</strong>

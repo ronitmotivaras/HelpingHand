@@ -3,7 +3,8 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Leaf, UserCircle, Phone, Lock, MapPin, AlertCircle, Building2, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { validatePassword } from '../utils/validation';
+import { validatePassword, validateMobile } from '../utils/validation';
+import { CITIES } from '../constants/cities';
 
 export default function Register() {
   const { register, isAuthenticated } = useAuth();
@@ -48,14 +49,30 @@ export default function Register() {
 
   function updateDonator(field, value) {
     setDonatorForm((prev) => ({ ...prev, [field]: value }));
-    if (fieldErrors[field]) {
+    if (field === 'mobile') {
+      if (/[^0-9]/.test(value)) {
+        setFieldErrors((prev) => ({ ...prev, mobile: 'Only numbers (0-9) are allowed. No characters, symbols, or spaces.' }));
+      } else if (value.length > 0 && value.length !== 10) {
+        setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number must be exactly 10 digits' }));
+      } else {
+        setFieldErrors((prev) => ({ ...prev, mobile: '' }));
+      }
+    } else if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: '' }));
     }
   }
 
   function updateNgo(field, value) {
     setNgoForm((prev) => ({ ...prev, [field]: value }));
-    if (fieldErrors[field]) {
+    if (field === 'contactNum') {
+      if (/[^0-9]/.test(value)) {
+        setFieldErrors((prev) => ({ ...prev, contactNum: 'Only numbers (0-9) are allowed. No characters, symbols, or spaces.' }));
+      } else if (value.length > 0 && value.length !== 10) {
+        setFieldErrors((prev) => ({ ...prev, contactNum: 'Mobile number must be exactly 10 digits' }));
+      } else {
+        setFieldErrors((prev) => ({ ...prev, contactNum: '' }));
+      }
+    } else if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: '' }));
     }
   }
@@ -71,8 +88,9 @@ export default function Register() {
 
     const errors = {};
     if (!donatorForm.name.trim()) errors.name = 'Please enter your full name';
-    if (!donatorForm.mobile.trim()) errors.mobile = 'Please enter your mobile number';
-    if (!donatorForm.city.trim()) errors.city = 'Please enter your city';
+    const mError = validateMobile(donatorForm.mobile);
+    if (mError) errors.mobile = mError;
+    if (!donatorForm.city.trim()) errors.city = 'Please select your city';
 
     setPasswordErrors(pErrors);
     setConfirmPasswordError(cError);
@@ -112,9 +130,10 @@ export default function Register() {
 
     const errors = {};
     if (!ngoForm.ngoName.trim()) errors.ngoName = 'Please enter organization/trust name';
-    if (!ngoForm.city.trim()) errors.city = 'Please enter NGO city';
+    if (!ngoForm.city.trim()) errors.city = 'Please select NGO city';
     if (!ngoForm.address.trim()) errors.address = 'Please enter operating address';
-    if (!ngoForm.contactNum.trim()) errors.contactNum = 'Please enter contact number';
+    const contactError = validateMobile(ngoForm.contactNum);
+    if (contactError) errors.contactNum = contactError;
     if (!ngoForm.coordinatorName.trim()) errors.coordinatorName = 'Please enter coordinator name';
 
     setPasswordErrors(pErrors);
@@ -268,15 +287,21 @@ export default function Register() {
                 >
                   <MapPin size={16} />
                 </div>
-                <input
+                <select
                   id="donator-city"
                   className="form-control"
                   style={{ paddingLeft: '2.4rem' }}
-                  placeholder="e.g. Ahmedabad, Surat, Mumbai"
                   value={donatorForm.city}
                   onChange={(e) => updateDonator('city', e.target.value)}
                   required
-                />
+                >
+                  <option value="">Select your city...</option>
+                  {CITIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
               {fieldErrors.city && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
@@ -429,15 +454,21 @@ export default function Register() {
                   >
                     <MapPin size={16} />
                   </div>
-                  <input
+                  <select
                     id="ngo-city"
                     className="form-control"
                     style={{ paddingLeft: '2.4rem' }}
-                    placeholder="e.g. Ahmedabad"
                     value={ngoForm.city}
                     onChange={(e) => updateNgo('city', e.target.value)}
                     required
-                  />
+                  >
+                    <option value="">Select NGO city...</option>
+                    {CITIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {fieldErrors.city && (
                   <div className="text-danger small mt-1 d-flex align-items-center gap-1">

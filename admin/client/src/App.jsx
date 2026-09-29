@@ -29,7 +29,23 @@ export default function App() {
         }
       />
       <Route
+        path="/ngo-list"
+        element={
+          <ProtectedRoute>
+            <NgoVerification />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/user-accounts"
+        element={
+          <ProtectedRoute>
+            <UserAccounts />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/donators"
         element={
           <ProtectedRoute>
             <UserAccounts />

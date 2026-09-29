@@ -14,7 +14,7 @@ export function validatePassword(password) {
 
 export function validateMobile(mobile) {
   if (!mobile || !String(mobile).trim()) {
-    return 'Please enter your mobile number';
+    return 'Please enter mobile number';
   }
   const str = String(mobile).trim();
   if (/[^0-9]/.test(str)) {
