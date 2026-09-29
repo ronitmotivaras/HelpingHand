@@ -14,7 +14,7 @@ const ngoDetailsSchema = new mongoose.Schema(
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  mobile: { type: String, required: true, unique: true, trim: true },
+  mobile: { type: String, sparse: true, trim: true, default: '' },
   passwordHash: { type: String, required: true },
   city: { type: String, required: true, trim: true },
   ngoStatus: {

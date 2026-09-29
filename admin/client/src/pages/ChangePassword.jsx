@@ -86,14 +86,14 @@ export default function ChangePassword() {
       <AdminSidebar />
 
       <main className="admin-main">
-        <div className="admin-breadcrumb-bar">
+        <div className="admin-breadcrumb-bar" style={{ maxWidth: '520px', margin: '0 auto var(--space-4)' }}>
           <div>
             <div className="admin-breadcrumb">Admin / Change Password</div>
             <h1 className="admin-page-title">Change Password</h1>
           </div>
         </div>
 
-        <div style={{ maxWidth: '520px' }}>
+        <div style={{ maxWidth: '520px', margin: '0 auto' }}>
           <section className="admin-card-panel">
             <div className="panel-header">
               <h2 className="panel-title">

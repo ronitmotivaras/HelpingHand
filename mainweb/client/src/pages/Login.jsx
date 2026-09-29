@@ -41,9 +41,13 @@ export default function Login() {
     e.preventDefault();
 
     const errors = {};
-    const mobileErr = validateMobile(mobile);
-    if (mobileErr) {
-      errors.mobile = mobileErr;
+    if (!mobile || !mobile.trim()) {
+      errors.mobile = 'Please enter your registered mobile number or NGO name';
+    } else {
+      const clean = mobile.trim();
+      if (/^\d+$/.test(clean) && clean.length !== 10) {
+        errors.mobile = 'Mobile number must be exactly 10 digits';
+      }
     }
     if (!password) {
       errors.password = 'Please enter your password';
@@ -57,11 +61,11 @@ export default function Login() {
     setFieldErrors({});
     setLoading(true);
     try {
-      await login(mobile, password);
+      await login(mobile.trim(), password);
       toast.success('Welcome back to HelpingHand!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Incorrect mobile number or password');
+      toast.error(err.response?.data?.message || 'Incorrect mobile number/NGO name or password');
     } finally {
       setLoading(false);
     }
@@ -78,7 +82,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group mb-3">
-            <label className="form-label" htmlFor="login-mobile">Registered Mobile Number</label>
+            <label className="form-label" htmlFor="login-mobile">Registered Mobile Number / NGO Name</label>
             <div style={{ position: 'relative' }}>
               <div
                 style={{
@@ -99,7 +103,7 @@ export default function Login() {
                   paddingLeft: '2.4rem',
                   borderColor: fieldErrors.mobile ? 'var(--color-danger)' : undefined,
                 }}
-                placeholder="e.g. 9876543210"
+                placeholder="e.g. 9876543210 or NGO Name"
                 value={mobile}
                 onChange={(e) => handleMobileChange(e.target.value)}
                 autoFocus={!location.state?.mobile}

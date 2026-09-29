@@ -20,7 +20,6 @@ export default function NgoVerification() {
   const [ngos, setNgos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('all');
   const [cityFilter, setCityFilter] = useState('');
   const [search, setSearch] = useState('');
 
@@ -77,14 +76,8 @@ export default function NgoVerification() {
   }
 
   const pendingCount = ngos ? ngos.filter((n) => n.ngoStatus === 'pending').length : 0;
-  const approvedCount = ngos ? ngos.filter((n) => n.ngoStatus === 'approved').length : 0;
 
   const filteredNgos = (ngos || []).filter((ngo) => {
-    // Status filter
-    if (statusFilter !== 'all' && ngo.ngoStatus !== statusFilter) {
-      return false;
-    }
-
     // City filter
     const ngoCity = ngo.ngoDetails?.city || ngo.city || '';
     if (cityFilter && ngoCity.toLowerCase() !== cityFilter.toLowerCase()) {
@@ -163,34 +156,6 @@ export default function NgoVerification() {
                     ))}
                   </select>
                 </div>
-              </div>
-
-              {/* Status Tabs */}
-              <div className="filter-button-group">
-                <button
-                  className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setStatusFilter('all')}
-                >
-                  All ({ngos ? ngos.length : 0})
-                </button>
-                <button
-                  className={`filter-btn ${statusFilter === 'pending' ? 'active' : ''}`}
-                  onClick={() => setStatusFilter('pending')}
-                >
-                  Pending ({pendingCount})
-                </button>
-                <button
-                  className={`filter-btn ${statusFilter === 'approved' ? 'active' : ''}`}
-                  onClick={() => setStatusFilter('approved')}
-                >
-                  Verified ({approvedCount})
-                </button>
-                <button
-                  className={`filter-btn ${statusFilter === 'rejected' ? 'active' : ''}`}
-                  onClick={() => setStatusFilter('rejected')}
-                >
-                  Declined
-                </button>
               </div>
             </div>
 

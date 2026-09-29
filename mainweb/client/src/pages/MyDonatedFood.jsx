@@ -107,7 +107,7 @@ export default function MyDonatedFood() {
               <Inbox size={56} color="var(--color-text-muted)" strokeWidth={1.5} />
             </div>
             <h3 className="section-title mb-2">No donations posted yet</h3>
-            <p className="food-card-meta mb-4">
+            <p className="empty-state-text mb-4" style={{ textAlign: 'center', margin: '0 auto var(--space-4)' }}>
               Whenever you have extra food, list it here so someone in your community can pick it up!
             </p>
             <Link to="/donate" className="btn-hh-secondary d-inline-flex align-items-center gap-2">
