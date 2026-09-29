@@ -29,8 +29,64 @@ async function register(req, res) {
       coordinatorPhone,
     } = req.body;
 
+    const isNgo = accountType === 'ngo';
+
+    if (isNgo) {
+      const finalNgoName = String(ngoName || '').trim();
+      const finalAddress = String(address || ngoAddress || '').trim();
+      const finalCity = String(city || '').trim();
+      const finalContactNum = String(contactNum || ngoContactNum || mobile || '').trim();
+      const finalCoordinatorName = String(coordinatorName || '').trim();
+
+      if (!finalNgoName || !finalAddress || !finalCity || !finalContactNum || !finalCoordinatorName || !password || !confirmPassword) {
+        return res.status(400).json({ message: 'All NGO fields are required' });
+      }
+
+      if (password !== confirmPassword) {
+        return res.status(400).json({ message: 'Passwords do not match' });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters' });
+      }
+      if (password.length > 30) {
+        return res.status(400).json({ message: 'Password must be no more than 30 characters' });
+      }
+      if (/[^a-zA-Z0-9@]/.test(password)) {
+        return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
+      }
+
+      const existing = await User.findOne({ mobile: finalContactNum });
+      if (existing) {
+        return res.status(409).json({ message: 'Contact number is already registered' });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const user = await User.create({
+        name: finalNgoName,
+        mobile: finalContactNum,
+        passwordHash,
+        city: finalCity,
+        ngoStatus: 'pending',
+        ngoDetails: {
+          ngoName: finalNgoName,
+          address: finalAddress,
+          city: finalCity,
+          contactNum: finalContactNum,
+          coordinatorName: finalCoordinatorName,
+          coordinatorPhone: finalContactNum,
+        },
+      });
+
+      return res.status(201).json({
+        message: 'Account created successfully. Please sign in.',
+        user: sanitizeUser(user),
+      });
+    }
+
+    // Donator registration
     if (!name || !mobile || !password || !confirmPassword || !city) {
-      return res.status(400).json({ message: 'All personal fields are required' });
+      return res.status(400).json({ message: 'All fields are required' });
     }
 
     if (password !== confirmPassword) {
@@ -47,37 +103,20 @@ async function register(req, res) {
       return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
     }
 
-    const isNgo = accountType === 'ngo';
-    if (isNgo) {
-      if (!ngoName || !ngoAddress || !ngoContactNum || !coordinatorPhone) {
-        return res.status(400).json({ message: 'All NGO fields are required' });
-      }
-    }
-
     const existing = await User.findOne({ mobile: String(mobile).trim() });
     if (existing) {
       return res.status(409).json({ message: 'Mobile number is already registered' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const userPayload = {
+    const user = await User.create({
       name: name.trim(),
       mobile: String(mobile).trim(),
       passwordHash,
       city: city.trim(),
-      ngoStatus: isNgo ? 'pending' : 'none',
-      ngoDetails: isNgo
-        ? {
-            ngoName: String(ngoName).trim(),
-            address: String(ngoAddress).trim(),
-            city: city.trim(),
-            contactNum: String(ngoContactNum).trim(),
-            coordinatorPhone: String(coordinatorPhone).trim(),
-          }
-        : {},
-    };
-
-    const user = await User.create(userPayload);
+      ngoStatus: 'none',
+      ngoDetails: {},
+    });
 
     return res.status(201).json({
       message: 'Account created successfully. Please sign in.',

@@ -1,25 +1,35 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Leaf, UserCircle, Phone, Lock, MapPin, AlertCircle, Building2 } from 'lucide-react';
+import { Leaf, UserCircle, Phone, Lock, MapPin, AlertCircle, Building2, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { validatePassword } from '../utils/validation';
 
 export default function Register() {
   const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [accountType, setAccountType] = useState('user');
-  const [form, setForm] = useState({
+  const [accountType, setAccountType] = useState('donator'); // 'donator' or 'ngo'
+
+  // Donator Form State
+  const [donatorForm, setDonatorForm] = useState({
     name: '',
     mobile: '',
+    city: '',
     password: '',
     confirmPassword: '',
-    city: '',
-    ngoName: '',
-    ngoAddress: '',
-    ngoContactNum: '',
-    coordinatorPhone: '',
   });
+
+  // NGO Form State
+  const [ngoForm, setNgoForm] = useState({
+    ngoName: '',
+    city: '',
+    address: '',
+    contactNum: '',
+    coordinatorName: '',
+    password: '',
+    confirmPassword: '',
+  });
+
   const [passwordErrors, setPasswordErrors] = useState([]);
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -29,29 +39,40 @@ export default function Register() {
     return <Navigate to="/" replace />;
   }
 
-  function update(field, value) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  function handleAccountTypeChange(type) {
+    setAccountType(type);
+    setPasswordErrors([]);
+    setConfirmPasswordError('');
+    setFieldErrors({});
+  }
+
+  function updateDonator(field, value) {
+    setDonatorForm((prev) => ({ ...prev, [field]: value }));
     if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: '' }));
     }
   }
 
-  async function handleSubmit(e) {
+  function updateNgo(field, value) {
+    setNgoForm((prev) => ({ ...prev, [field]: value }));
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+  }
+
+  async function handleDonatorSubmit(e) {
     e.preventDefault();
 
-    const pErrors = validatePassword(form.password);
+    const pErrors = validatePassword(donatorForm.password);
     let cError = '';
-    if (form.password !== form.confirmPassword) {
+    if (donatorForm.password !== donatorForm.confirmPassword) {
       cError = 'Passwords do not match';
     }
 
     const errors = {};
-    if (accountType === 'ngo') {
-      if (!form.ngoName.trim()) errors.ngoName = 'Please enter NGO name';
-      if (!form.ngoAddress.trim()) errors.ngoAddress = 'Please enter NGO address';
-      if (!form.ngoContactNum.trim()) errors.ngoContactNum = 'Please enter NGO contact number';
-      if (!form.coordinatorPhone.trim()) errors.coordinatorPhone = 'Please enter coordinator phone';
-    }
+    if (!donatorForm.name.trim()) errors.name = 'Please enter your full name';
+    if (!donatorForm.mobile.trim()) errors.mobile = 'Please enter your mobile number';
+    if (!donatorForm.city.trim()) errors.city = 'Please enter your city';
 
     setPasswordErrors(pErrors);
     setConfirmPasswordError(cError);
@@ -64,19 +85,15 @@ export default function Register() {
     setLoading(true);
     try {
       await register({
-        name: form.name.trim(),
-        mobile: form.mobile.trim(),
-        password: form.password,
-        confirmPassword: form.confirmPassword,
-        city: form.city.trim(),
-        accountType,
-        ngoName: form.ngoName.trim(),
-        ngoAddress: form.ngoAddress.trim(),
-        ngoContactNum: form.ngoContactNum.trim(),
-        coordinatorPhone: form.coordinatorPhone.trim(),
+        accountType: 'donator',
+        name: donatorForm.name.trim(),
+        mobile: donatorForm.mobile.trim(),
+        city: donatorForm.city.trim(),
+        password: donatorForm.password,
+        confirmPassword: donatorForm.confirmPassword,
       });
-      toast.success('Account created successfully! Please sign in.');
-      navigate('/login', { state: { mobile: form.mobile } });
+      toast.success('Donator account created successfully! Please sign in.');
+      navigate('/login', { state: { mobile: donatorForm.mobile } });
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
     } finally {
@@ -84,16 +101,61 @@ export default function Register() {
     }
   }
 
+  async function handleNgoSubmit(e) {
+    e.preventDefault();
+
+    const pErrors = validatePassword(ngoForm.password);
+    let cError = '';
+    if (ngoForm.password !== ngoForm.confirmPassword) {
+      cError = 'Passwords do not match';
+    }
+
+    const errors = {};
+    if (!ngoForm.ngoName.trim()) errors.ngoName = 'Please enter organization/trust name';
+    if (!ngoForm.city.trim()) errors.city = 'Please enter NGO city';
+    if (!ngoForm.address.trim()) errors.address = 'Please enter operating address';
+    if (!ngoForm.contactNum.trim()) errors.contactNum = 'Please enter contact number';
+    if (!ngoForm.coordinatorName.trim()) errors.coordinatorName = 'Please enter coordinator name';
+
+    setPasswordErrors(pErrors);
+    setConfirmPasswordError(cError);
+    setFieldErrors(errors);
+
+    if (pErrors.length > 0 || cError || Object.keys(errors).length > 0) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await register({
+        accountType: 'ngo',
+        ngoName: ngoForm.ngoName.trim(),
+        city: ngoForm.city.trim(),
+        address: ngoForm.address.trim(),
+        contactNum: ngoForm.contactNum.trim(),
+        coordinatorName: ngoForm.coordinatorName.trim(),
+        password: ngoForm.password,
+        confirmPassword: ngoForm.confirmPassword,
+      });
+      toast.success('NGO verification application submitted! Please sign in.');
+      navigate('/login', { state: { mobile: ngoForm.contactNum } });
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'NGO Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="hh-auth-wrap">
-      <div className="hh-auth-card" style={{ maxWidth: accountType === 'ngo' ? '540px' : '480px' }}>
+      <div className="hh-auth-card" style={{ maxWidth: '520px' }}>
         <div className="d-flex align-items-center gap-2 mb-2">
           <Leaf size={28} color="var(--color-primary)" strokeWidth={2.5} />
           <h1 className="section-title mb-0" style={{ color: 'var(--color-primary)' }}>Join HelpingHand</h1>
         </div>
-        <p className="food-card-meta mb-4">Register to share or receive extra food in your city.</p>
+        <p className="food-card-meta mb-4">Community surplus food rescue network.</p>
 
-        {/* Choice at top: Register as: User (default) / NGO */}
+        {/* Choice at top: Register as: Donator (default) / NGO */}
         <div className="form-group mb-4">
           <label className="form-label mb-2" style={{ fontWeight: 600 }}>Register as:</label>
           <div className="d-flex gap-4">
@@ -101,12 +163,12 @@ export default function Register() {
               <input
                 type="radio"
                 name="accountType"
-                value="user"
-                checked={accountType === 'user'}
-                onChange={() => setAccountType('user')}
+                value="donator"
+                checked={accountType === 'donator'}
+                onChange={() => handleAccountTypeChange('donator')}
                 style={{ accentColor: 'var(--color-primary)', width: '17px', height: '17px', cursor: 'pointer' }}
               />
-              <span>User</span>
+              <span>Donator</span>
             </label>
             <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontWeight: 600, fontSize: 'var(--text-base)' }}>
               <input
@@ -114,7 +176,7 @@ export default function Register() {
                 name="accountType"
                 value="ngo"
                 checked={accountType === 'ngo'}
-                onChange={() => setAccountType('ngo')}
+                onChange={() => handleAccountTypeChange('ngo')}
                 style={{ accentColor: 'var(--color-primary)', width: '17px', height: '17px', cursor: 'pointer' }}
               />
               <span>NGO</span>
@@ -122,64 +184,11 @@ export default function Register() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group mb-3">
-            <label className="form-label" htmlFor="reg-name">Full Name</label>
-            <div style={{ position: 'relative' }}>
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                  color: 'var(--color-text-muted)',
-                }}
-              >
-                <UserCircle size={16} />
-              </div>
-              <input
-                id="reg-name"
-                className="form-control"
-                style={{ paddingLeft: '2.4rem' }}
-                placeholder="e.g. Ramesh Patel"
-                value={form.name}
-                onChange={(e) => update('name', e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group mb-3">
-            <label className="form-label" htmlFor="reg-mobile">Mobile Number</label>
-            <div style={{ position: 'relative' }}>
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                  color: 'var(--color-text-muted)',
-                }}
-              >
-                <Phone size={16} />
-              </div>
-              <input
-                id="reg-mobile"
-                className="form-control"
-                style={{ paddingLeft: '2.4rem' }}
-                placeholder="e.g. 9876543210"
-                value={form.mobile}
-                onChange={(e) => update('mobile', e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="row g-3 mb-3">
-            <div className="col-sm-6 form-group">
-              <label className="form-label" htmlFor="reg-password">Password</label>
+        {/* DONATOR REGISTRATION FORM */}
+        {accountType === 'donator' && (
+          <form onSubmit={handleDonatorSubmit}>
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="donator-name">Full Name</label>
               <div style={{ position: 'relative' }}>
                 <div
                   style={{
@@ -191,96 +200,95 @@ export default function Register() {
                     color: 'var(--color-text-muted)',
                   }}
                 >
-                  <Lock size={16} />
+                  <UserCircle size={16} />
                 </div>
                 <input
-                  id="reg-password"
-                  type="password"
+                  id="donator-name"
                   className="form-control"
                   style={{ paddingLeft: '2.4rem' }}
-                  placeholder="6+ chars"
-                  value={form.password}
-                  onChange={(e) => update('password', e.target.value)}
-                  onPaste={(e) => e.preventDefault()}
+                  placeholder="e.g. Ramesh Patel"
+                  value={donatorForm.name}
+                  onChange={(e) => updateDonator('name', e.target.value)}
                   required
                 />
               </div>
-              {passwordErrors.map((err, idx) => (
-                <div key={idx} className="text-danger small mt-1 d-flex align-items-center gap-1">
-                  <AlertCircle size={13} />
-                  <span>{err}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="col-sm-6 form-group">
-              <label className="form-label" htmlFor="reg-confirm">Confirm Password</label>
-              <div style={{ position: 'relative' }}>
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    color: 'var(--color-text-muted)',
-                  }}
-                >
-                  <Lock size={16} />
-                </div>
-                <input
-                  id="reg-confirm"
-                  type="password"
-                  className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
-                  placeholder="Re-enter"
-                  value={form.confirmPassword}
-                  onChange={(e) => update('confirmPassword', e.target.value)}
-                  onPaste={(e) => e.preventDefault()}
-                  required
-                />
-              </div>
-              {confirmPasswordError && (
+              {fieldErrors.name && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={13} />
-                  <span>{confirmPasswordError}</span>
+                  <span>{fieldErrors.name}</span>
                 </div>
               )}
             </div>
-          </div>
 
-          <div className="form-group mb-3">
-            <label className="form-label" htmlFor="reg-city">City</label>
-            <div style={{ position: 'relative' }}>
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                  color: 'var(--color-text-muted)',
-                }}
-              >
-                <MapPin size={16} />
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="donator-mobile">Mobile Number</label>
+              <div style={{ position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  <Phone size={16} />
+                </div>
+                <input
+                  id="donator-mobile"
+                  className="form-control"
+                  style={{ paddingLeft: '2.4rem' }}
+                  placeholder="e.g. 9876543210"
+                  value={donatorForm.mobile}
+                  onChange={(e) => updateDonator('mobile', e.target.value)}
+                  required
+                />
               </div>
-              <input
-                id="reg-city"
-                className="form-control"
-                style={{ paddingLeft: '2.4rem' }}
-                placeholder="e.g. Ahmedabad, Surat, Mumbai"
-                value={form.city}
-                onChange={(e) => update('city', e.target.value)}
-                required
-              />
+              {fieldErrors.mobile && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.mobile}</span>
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Additional NGO Fields directly below, only while NGO is selected */}
-          {accountType === 'ngo' && (
-            <div className="pt-2 mb-3 border-top" style={{ borderColor: 'var(--color-border)' }}>
-              <div className="form-group mb-3">
-                <label className="form-label" htmlFor="reg-ngo-name">NGO Name</label>
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="donator-city">City</label>
+              <div style={{ position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  <MapPin size={16} />
+                </div>
+                <input
+                  id="donator-city"
+                  className="form-control"
+                  style={{ paddingLeft: '2.4rem' }}
+                  placeholder="e.g. Ahmedabad, Surat, Mumbai"
+                  value={donatorForm.city}
+                  onChange={(e) => updateDonator('city', e.target.value)}
+                  required
+                />
+              </div>
+              {fieldErrors.city && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.city}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="row g-3 mb-4">
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="donator-password">Password</label>
                 <div style={{ position: 'relative' }}>
                   <div
                     style={{
@@ -292,102 +300,329 @@ export default function Register() {
                       color: 'var(--color-text-muted)',
                     }}
                   >
-                    <Building2 size={16} />
+                    <Lock size={16} />
                   </div>
                   <input
-                    id="reg-ngo-name"
+                    id="donator-password"
+                    type="password"
                     className="form-control"
                     style={{ paddingLeft: '2.4rem' }}
-                    placeholder="e.g. Seva Food Relief Foundation"
-                    value={form.ngoName}
-                    onChange={(e) => update('ngoName', e.target.value)}
+                    placeholder="6+ chars"
+                    value={donatorForm.password}
+                    onChange={(e) => updateDonator('password', e.target.value)}
+                    onPaste={(e) => e.preventDefault()}
                     required
                   />
                 </div>
-                {fieldErrors.ngoName && (
-                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                {passwordErrors.map((err, idx) => (
+                  <div key={idx} className="text-danger small mt-1 d-flex align-items-center gap-1">
                     <AlertCircle size={13} />
-                    <span>{fieldErrors.ngoName}</span>
+                    <span>{err}</span>
                   </div>
-                )}
+                ))}
               </div>
 
-              <div className="form-group mb-3">
-                <label className="form-label" htmlFor="reg-ngo-address">NGO Address</label>
-                <textarea
-                  id="reg-ngo-address"
-                  className="form-control"
-                  rows="2"
-                  placeholder="Community center or kitchen address..."
-                  value={form.ngoAddress}
-                  onChange={(e) => update('ngoAddress', e.target.value)}
-                  required
-                />
-                {fieldErrors.ngoAddress && (
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="donator-confirm">Confirm Password</label>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
+                    <Lock size={16} />
+                  </div>
+                  <input
+                    id="donator-confirm"
+                    type="password"
+                    className="form-control"
+                    style={{ paddingLeft: '2.4rem' }}
+                    placeholder="Re-enter"
+                    value={donatorForm.confirmPassword}
+                    onChange={(e) => updateDonator('confirmPassword', e.target.value)}
+                    onPaste={(e) => e.preventDefault()}
+                    required
+                  />
+                </div>
+                {confirmPasswordError && (
                   <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                     <AlertCircle size={13} />
-                    <span>{fieldErrors.ngoAddress}</span>
+                    <span>{confirmPasswordError}</span>
                   </div>
                 )}
-              </div>
-
-              <div className="row g-3 mb-2">
-                <div className="col-sm-6 form-group">
-                  <label className="form-label" htmlFor="reg-ngo-contact">NGO Contact Number</label>
-                  <input
-                    id="reg-ngo-contact"
-                    className="form-control"
-                    placeholder="e.g. 022-12345678"
-                    value={form.ngoContactNum}
-                    onChange={(e) => update('ngoContactNum', e.target.value)}
-                    required
-                  />
-                  {fieldErrors.ngoContactNum && (
-                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                      <AlertCircle size={13} />
-                      <span>{fieldErrors.ngoContactNum}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="col-sm-6 form-group">
-                  <label className="form-label" htmlFor="reg-coord-contact">Coordinator Contact Phone</label>
-                  <input
-                    id="reg-coord-contact"
-                    className="form-control"
-                    placeholder="e.g. 9876543210"
-                    value={form.coordinatorPhone}
-                    onChange={(e) => update('coordinatorPhone', e.target.value)}
-                    required
-                  />
-                  {fieldErrors.coordinatorPhone && (
-                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                      <AlertCircle size={13} />
-                      <span>{fieldErrors.coordinatorPhone}</span>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
-          )}
 
-          <div className="pt-2">
-            <button
-              className="btn-hh-primary w-100 justify-content-center d-flex align-items-center gap-2"
-              disabled={loading}
-              type="submit"
-            >
-              {loading ? (
-                <>
-                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                  <span>Creating Account...</span>
-                </>
-              ) : (
-                'Create Account'
+            <div className="pt-2">
+              <button
+                className="btn-hh-primary w-100 justify-content-center d-flex align-items-center gap-2"
+                disabled={loading}
+                type="submit"
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span>Creating Donator Account...</span>
+                  </>
+                ) : (
+                  'Create Donator Account'
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* NGO REGISTRATION FORM */}
+        {accountType === 'ngo' && (
+          <form onSubmit={handleNgoSubmit}>
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="ngo-name">NGO Name</label>
+              <div style={{ position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  <Building2 size={16} />
+                </div>
+                <input
+                  id="ngo-name"
+                  className="form-control"
+                  style={{ paddingLeft: '2.4rem' }}
+                  placeholder="e.g. Seva Food Relief Foundation"
+                  value={ngoForm.ngoName}
+                  onChange={(e) => updateNgo('ngoName', e.target.value)}
+                  required
+                />
+              </div>
+              {fieldErrors.ngoName && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.ngoName}</span>
+                </div>
               )}
-            </button>
-          </div>
-        </form>
+            </div>
+
+            <div className="row g-3 mb-3">
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="ngo-city">NGO City</label>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
+                    <MapPin size={16} />
+                  </div>
+                  <input
+                    id="ngo-city"
+                    className="form-control"
+                    style={{ paddingLeft: '2.4rem' }}
+                    placeholder="e.g. Ahmedabad"
+                    value={ngoForm.city}
+                    onChange={(e) => updateNgo('city', e.target.value)}
+                    required
+                  />
+                </div>
+                {fieldErrors.city && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{fieldErrors.city}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="ngo-contact-num">Contact Number</label>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
+                    <Phone size={16} />
+                  </div>
+                  <input
+                    id="ngo-contact-num"
+                    className="form-control"
+                    style={{ paddingLeft: '2.4rem' }}
+                    placeholder="e.g. 9876543210"
+                    value={ngoForm.contactNum}
+                    onChange={(e) => updateNgo('contactNum', e.target.value)}
+                    required
+                  />
+                </div>
+                {fieldErrors.contactNum && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{fieldErrors.contactNum}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="ngo-address">Address</label>
+              <textarea
+                id="ngo-address"
+                className="form-control"
+                rows="2"
+                placeholder="Operating address, community center, or kitchen..."
+                value={ngoForm.address}
+                onChange={(e) => updateNgo('address', e.target.value)}
+                required
+              />
+              {fieldErrors.address && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.address}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="ngo-coordinator-name">Coordinator Name</label>
+              <div style={{ position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  <User size={16} />
+                </div>
+                <input
+                  id="ngo-coordinator-name"
+                  className="form-control"
+                  style={{ paddingLeft: '2.4rem' }}
+                  placeholder="e.g. Anjali Sharma"
+                  value={ngoForm.coordinatorName}
+                  onChange={(e) => updateNgo('coordinatorName', e.target.value)}
+                  required
+                />
+              </div>
+              {fieldErrors.coordinatorName && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.coordinatorName}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="row g-3 mb-4">
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="ngo-password">Password</label>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
+                    <Lock size={16} />
+                  </div>
+                  <input
+                    id="ngo-password"
+                    type="password"
+                    className="form-control"
+                    style={{ paddingLeft: '2.4rem' }}
+                    placeholder="6+ chars"
+                    value={ngoForm.password}
+                    onChange={(e) => updateNgo('password', e.target.value)}
+                    onPaste={(e) => e.preventDefault()}
+                    required
+                  />
+                </div>
+                {passwordErrors.map((err, idx) => (
+                  <div key={idx} className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{err}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="ngo-confirm">Confirm Password</label>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
+                    <Lock size={16} />
+                  </div>
+                  <input
+                    id="ngo-confirm"
+                    type="password"
+                    className="form-control"
+                    style={{ paddingLeft: '2.4rem' }}
+                    placeholder="Re-enter"
+                    value={ngoForm.confirmPassword}
+                    onChange={(e) => updateNgo('confirmPassword', e.target.value)}
+                    onPaste={(e) => e.preventDefault()}
+                    required
+                  />
+                </div>
+                {confirmPasswordError && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{confirmPasswordError}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                className="btn-hh-primary w-100 justify-content-center d-flex align-items-center gap-2"
+                disabled={loading}
+                type="submit"
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span>Submitting NGO Registration...</span>
+                  </>
+                ) : (
+                  'Register as NGO'
+                )}
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="mt-4 pt-3 text-center border-top" style={{ borderColor: 'var(--color-border)' }}>
           <span className="food-card-meta">

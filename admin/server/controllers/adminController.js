@@ -20,6 +20,7 @@ function sanitizeUser(user) {
       contactNum: rawNgo.contactNum || rawNgo.contactNumber || user.mobile || '',
       contactNumber: rawNgo.contactNumber || rawNgo.contactNum || user.mobile || '',
       coordinatorPhone: rawNgo.coordinatorPhone || '',
+      coordinatorName: rawNgo.coordinatorName || '',
     },
     createdAt: user.createdAt,
   };

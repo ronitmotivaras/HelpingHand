@@ -7,6 +7,7 @@ const ngoDetailsSchema = new mongoose.Schema(
     city: { type: String, default: '' },
     contactNum: { type: String, default: '' },
     coordinatorPhone: { type: String, default: '' },
+    coordinatorName: { type: String, default: '' },
   },
   { _id: false }
 );

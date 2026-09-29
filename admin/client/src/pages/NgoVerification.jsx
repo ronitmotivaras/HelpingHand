@@ -119,8 +119,8 @@ export default function NgoVerification() {
                 const ngoName = req.ngoDetails?.ngoName || req.ngoDetails?.name || 'Unnamed NGO';
                 const city = req.ngoDetails?.city || req.city || '—';
                 const address = req.ngoDetails?.address || '—';
-                const contactNum = req.ngoDetails?.contactNum || req.ngoDetails?.contactNumber || '—';
-                const coordinatorPhone = req.ngoDetails?.coordinatorPhone || req.mobile || '—';
+                const contactNum = req.ngoDetails?.contactNum || req.ngoDetails?.contactNumber || req.mobile || '—';
+                const coordinatorName = req.ngoDetails?.coordinatorName || req.name || '—';
 
                 return (
                   <div
@@ -148,7 +148,7 @@ export default function NgoVerification() {
                           </h3>
                           <span className="badge-status pending">Pending Review</span>
                         </div>
-                        <div className="text-muted small mt-1">Applicant: {req.name} ({req.mobile})</div>
+                        <div className="text-muted small mt-1">Coordinator: {coordinatorName} &bull; Contact: {contactNum}</div>
                       </div>
 
                       <div className="d-flex gap-2">
@@ -186,15 +186,15 @@ export default function NgoVerification() {
                       </div>
                       <div className="col-md-3">
                         <div className="text-muted small d-flex align-items-center gap-1">
-                          <Phone size={13} /> NGO Contact
+                          <Phone size={13} /> Contact Number
                         </div>
                         <div className="fw-semibold mt-1" style={{ fontFamily: 'monospace' }}>{contactNum}</div>
                       </div>
                       <div className="col-md-3">
                         <div className="text-muted small d-flex align-items-center gap-1">
-                          <Phone size={13} /> Coordinator Phone
+                          <MapPin size={13} /> Coordinator
                         </div>
-                        <div className="fw-semibold mt-1" style={{ fontFamily: 'monospace' }}>{coordinatorPhone}</div>
+                        <div className="fw-semibold mt-1">{coordinatorName}</div>
                       </div>
                     </div>
                   </div>

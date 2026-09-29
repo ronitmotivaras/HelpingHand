@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const User = require('../models/User');
 const { sanitizeUser } = require('./authController');
 
 async function getProfile(req, res) {
@@ -7,12 +8,24 @@ async function getProfile(req, res) {
 
 async function updateProfile(req, res) {
   try {
-    const { name, city } = req.body;
+    const { name, mobile, city } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ message: 'Name is required' });
     }
+    if (!mobile || !String(mobile).trim()) {
+      return res.status(400).json({ message: 'Mobile number is required' });
+    }
     if (!city || !city.trim()) {
       return res.status(400).json({ message: 'City is required' });
+    }
+
+    const trimmedMobile = String(mobile).trim();
+    if (trimmedMobile !== req.user.mobile) {
+      const taken = await User.findOne({ mobile: trimmedMobile, _id: { $ne: req.user._id } });
+      if (taken) {
+        return res.status(409).json({ message: 'Mobile number is already registered to another account' });
+      }
+      req.user.mobile = trimmedMobile;
     }
 
     req.user.name = name.trim();
@@ -21,6 +34,9 @@ async function updateProfile(req, res) {
 
     return res.json(sanitizeUser(req.user));
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ message: 'Mobile number is already registered to another account' });
+    }
     return res.status(500).json({ message: 'Failed to update profile' });
   }
 }

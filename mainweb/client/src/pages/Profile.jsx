@@ -27,6 +27,7 @@ export default function Profile() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
+  const [editMobile, setEditMobile] = useState(user?.mobile || '');
   const [editCity, setEditCity] = useState(user?.city || '');
   const [saving, setSaving] = useState(false);
 
@@ -38,6 +39,7 @@ export default function Profile() {
 
   function startEditing() {
     setEditName(user?.name || '');
+    setEditMobile(user?.mobile || '');
     setEditCity(user?.city || '');
     setIsEditing(true);
   }
@@ -45,12 +47,17 @@ export default function Profile() {
   function cancelEditing() {
     setIsEditing(false);
     setEditName(user?.name || '');
+    setEditMobile(user?.mobile || '');
     setEditCity(user?.city || '');
   }
 
   async function saveEditing() {
     if (!editName.trim()) {
       toast.error('Name cannot be empty');
+      return;
+    }
+    if (!editMobile.trim()) {
+      toast.error('Mobile number cannot be empty');
       return;
     }
     if (!editCity.trim()) {
@@ -62,6 +69,7 @@ export default function Profile() {
     try {
       await api.put('/profile', {
         name: editName.trim(),
+        mobile: editMobile.trim(),
         city: editCity.trim(),
       });
       await refreshProfile();
@@ -147,7 +155,7 @@ export default function Profile() {
                   type="button"
                   onClick={startEditing}
                   aria-label="Edit Profile"
-                  title="Edit Name and City"
+                  title="Edit Profile Details"
                   style={{
                     background: 'none',
                     border: '1px solid var(--color-border)',
@@ -170,13 +178,25 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Registered Phone (read-only) */}
+          {/* Registered Phone (editable when isEditing) */}
           <div className="detail-row">
             <span className="d-flex align-items-center gap-2">
               <Phone size={15} color="var(--color-text-muted)" />
               <span>Registered Phone</span>
             </span>
-            <strong style={{ fontFamily: 'monospace' }}>{user?.mobile}</strong>
+            {isEditing ? (
+              <div style={{ maxWidth: '220px', width: '100%' }}>
+                <input
+                  className="form-control"
+                  style={{ padding: '4px 10px', fontSize: 'var(--text-sm)', fontFamily: 'monospace' }}
+                  value={editMobile}
+                  onChange={(e) => setEditMobile(e.target.value)}
+                  placeholder="Mobile number"
+                />
+              </div>
+            ) : (
+              <strong style={{ fontFamily: 'monospace' }}>{user?.mobile}</strong>
+            )}
           </div>
 
           {/* Primary City (editable in place) */}
@@ -200,28 +220,32 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Small read-only NGO status line */}
-          <div className="detail-row">
-            <span className="d-flex align-items-center gap-2">
-              <Shield size={15} color="var(--color-text-muted)" />
-              <span>NGO Status</span>
-            </span>
-            <span>
-              {user?.ngoStatus === 'approved' ? (
-                <span className="badge-status approved d-inline-flex align-items-center gap-1">
-                  <BadgeCheck size={13} />
-                  <span>NGO</span>
-                </span>
-              ) : user?.ngoStatus === 'pending' ? (
-                <span className="badge-status pending d-inline-flex align-items-center gap-1">
-                  <Clock size={13} />
-                  <span>Pending</span>
-                </span>
-              ) : (
-                <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>Not an NGO</span>
-              )}
-            </span>
-          </div>
+          {/* Small read-only NGO status line - ONLY shown if user registered as NGO */}
+          {user?.ngoStatus && user.ngoStatus !== 'none' && (
+            <div className="detail-row">
+              <span className="d-flex align-items-center gap-2">
+                <Shield size={15} color="var(--color-text-muted)" />
+                <span>NGO Status</span>
+              </span>
+              <span>
+                {user?.ngoStatus === 'approved' ? (
+                  <span className="badge-status approved d-inline-flex align-items-center gap-1">
+                    <BadgeCheck size={13} />
+                    <span>NGO</span>
+                  </span>
+                ) : user?.ngoStatus === 'pending' ? (
+                  <span className="badge-status pending d-inline-flex align-items-center gap-1">
+                    <Clock size={13} />
+                    <span>Pending</span>
+                  </span>
+                ) : (
+                  <span className="badge-status rejected d-inline-flex align-items-center gap-1">
+                    <span>Declined</span>
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Below info card: Two simple navigation rows */}

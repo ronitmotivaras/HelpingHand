@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="hh-admin-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="hh-green-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80" />
+      <stop offset="100%" stop-color="#16a34a" />
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#hh-admin-grad)" />
+  <path d="M24 10l12 4.5v9.5c0 7.5-5 14-12 16-7-2-12-8.5-12-16V14.5L24 10z" fill="url(#hh-green-grad)" />
+  <path d="M20 28c0-5 4-9 9-9h2v2c0 5-4 9-9 9h-2v-2z" fill="#ffffff" />
+  <path d="M22 26c3-1.5 5.5-4.5 6.5-8" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" fill="none" />
+</svg>
