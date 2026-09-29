@@ -76,6 +76,7 @@ export default function AdminDashboard() {
       <AdminSidebar
         pendingCount={stats?.pendingNgoReviews ?? (requests ? requests.length : undefined)}
         usersCount={stats?.totalUsers}
+        blockedCount={stats?.totalBlocked}
       />
 
       <main className="admin-main">

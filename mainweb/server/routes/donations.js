@@ -12,6 +12,7 @@ const {
   bookFood,
   releaseFood,
   markPickedUp,
+  getNgoProfileForDonor,
 } = require('../controllers/donationController');
 
 const router = express.Router();
@@ -31,6 +32,7 @@ router.post('/:id/cancel-request', cancelPickupRequest);
 // Donor actions on requests
 router.post('/:id/requests/:requestId/accept', acceptRequest);
 router.post('/:id/requests/:requestId/decline', declineRequest);
+router.get('/:id/ngo-profile/:ngoId', getNgoProfileForDonor);
 
 // Donor status lifecycle actions
 router.post('/:id/release', releaseFood);

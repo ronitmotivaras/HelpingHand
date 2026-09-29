@@ -19,6 +19,13 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ message: 'User not found' });
     }
 
+    if (user.isBlocked) {
+      return res.status(403).json({
+        message: 'Your account has been blocked by admin. Please contact support.',
+        isBlocked: true,
+      });
+    }
+
     req.user = user;
     next();
   } catch (err) {

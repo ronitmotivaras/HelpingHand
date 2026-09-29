@@ -1,6 +1,9 @@
 const FoodDonation = require('../models/FoodDonation');
+const User = require('../models/User');
+const Request = require('../models/Request');
+const { sendNotification } = require('../utils/notify');
 
-function publicDonation(doc, reqUser) {
+function publicDonation(doc, reqUser, blockedNgoIds = []) {
   // Normalize items for backward compatibility
   let items = doc.items && Array.isArray(doc.items) && doc.items.length > 0 ? doc.items : [];
   if (items.length === 0 && doc.foodName) {
@@ -19,7 +22,7 @@ function publicDonation(doc, reqUser) {
 
   // Only approved NGOs or the donor themselves can see the contact phone
   const isOwner = reqUser && String(doc.donorId) === String(reqUser._id);
-  const isApprovedNgo = reqUser && reqUser.ngoStatus === 'approved';
+  const isApprovedNgo = reqUser && reqUser.ngoStatus === 'approved' && !reqUser.isBlocked;
   const showPhone = Boolean(isOwner || isApprovedNgo);
 
   // Group summary (e.g. "15 portions + 3 kg")
@@ -37,8 +40,11 @@ function publicDonation(doc, reqUser) {
     .map(([unit, qty]) => `${qty} ${unit}`)
     .join(' + ') || doc.quantity || '';
 
-  // Calculate active pending requests count
-  const allRequests = Array.isArray(doc.requests) ? doc.requests : [];
+  // Filter out any requests from blocked NGOs
+  const blockedSet = new Set(blockedNgoIds.map(String));
+  const rawRequests = Array.isArray(doc.requests) ? doc.requests : [];
+  const allRequests = rawRequests.filter((r) => !blockedSet.has(String(r.ngoId)));
+
   const pendingRequests = allRequests.filter((r) => r.status === 'pending');
   const requestCount = pendingRequests.length;
 
@@ -133,9 +139,14 @@ async function listDonations(req, res) {
 
     const now = new Date();
 
+    // Hidden data: Hide listings from blocked users
+    const blockedUsers = await User.find({ isBlocked: true }, '_id');
+    const blockedIds = blockedUsers.map((u) => u._id);
+
     // NGO feed shows ONLY "available" listings where pickupTo has not passed
     const filter = {
       status: 'available',
+      donorId: { $nin: blockedIds },
       $or: [
         { pickupTo: { $gt: now } },
         { pickupTo: { $exists: false }, availableUpto: { $gt: now } },
@@ -163,14 +174,13 @@ async function listDonations(req, res) {
       });
     }
 
-    // Sort order: expiring soonest vs newest
     let sortOption = { createdAt: -1 };
     if (sort === 'expiring') {
       sortOption = { pickupTo: 1, expiryAt: 1, createdAt: -1 };
     }
 
     const donations = await FoodDonation.find(filter).sort(sortOption);
-    return res.json(donations.map((doc) => publicDonation(doc, req.user)));
+    return res.json(donations.map((doc) => publicDonation(doc, req.user, blockedIds)));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to load donations' });
   }
@@ -178,8 +188,11 @@ async function listDonations(req, res) {
 
 async function getMyHistory(req, res) {
   try {
+    const blockedUsers = await User.find({ isBlocked: true }, '_id');
+    const blockedIds = blockedUsers.map((u) => u._id);
+
     const donations = await FoodDonation.find({ donorId: req.user._id }).sort({ createdAt: -1 });
-    return res.json(donations.map((doc) => publicDonation(doc, req.user)));
+    return res.json(donations.map((doc) => publicDonation(doc, req.user, blockedIds)));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to load donation history' });
   }
@@ -191,7 +204,17 @@ async function getDonation(req, res) {
     if (!donation) {
       return res.status(404).json({ message: 'Donation not found' });
     }
-    return res.json(publicDonation(donation, req.user));
+
+    // Check if donor is blocked
+    const donor = await User.findById(donation.donorId);
+    if (donor && donor.isBlocked && String(donor._id) !== String(req.user._id)) {
+      return res.status(404).json({ message: 'This donation listing is no longer available' });
+    }
+
+    const blockedUsers = await User.find({ isBlocked: true }, '_id');
+    const blockedIds = blockedUsers.map((u) => u._id);
+
+    return res.json(publicDonation(donation, req.user, blockedIds));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to load donation' });
   }
@@ -213,7 +236,6 @@ async function createDonation(req, res) {
       address,
     } = req.body;
 
-    // Validate food items
     let parsedItems = [];
     if (Array.isArray(items) && items.length > 0) {
       parsedItems = items
@@ -265,7 +287,6 @@ async function createDonation(req, res) {
       return res.status(400).json({ message: 'Pickup address is required' });
     }
 
-    // Timing validations
     const rawFrom = pickupFrom || new Date();
     const rawTo = pickupTo || availableUpto;
     const rawExp = expiryAt || rawTo;
@@ -327,10 +348,10 @@ async function createDonation(req, res) {
   }
 }
 
-// NGO requests pickup (Only verified NGOs can request)
+// Requirement 2: Only verified NGOs can request
 async function requestPickup(req, res) {
   try {
-    if (!req.user || req.user.ngoStatus !== 'approved') {
+    if (!req.user || req.user.ngoStatus !== 'approved' || req.user.isBlocked) {
       return res.status(403).json({
         message: 'Only verified NGOs can request food pickup. Your account is waiting for verification.',
       });
@@ -355,11 +376,13 @@ async function requestPickup(req, res) {
       return res.status(400).json({ message: 'The pickup window for this listing has expired' });
     }
 
-    donation.requests = donation.requests || [];
-    const alreadyRequested = donation.requests.find(
-      (r) => String(r.ngoId) === String(req.user._id) && r.status === 'pending'
-    );
-    if (alreadyRequested) {
+    // Check if NGO already requested in Request collection or donation.requests
+    const existingActive = await Request.findOne({
+      foodId: donation._id,
+      ngoId: req.user._id,
+      status: 'pending',
+    });
+    if (existingActive) {
       return res.status(400).json({ message: 'You have already submitted a pickup request for this listing' });
     }
 
@@ -367,17 +390,43 @@ async function requestPickup(req, res) {
     const coordinatorName = req.user.ngoDetails?.coordinatorName || req.user.name || '';
     const phone = req.user.ngoDetails?.contactNum || req.user.ngoDetails?.coordinatorPhone || req.user.mobile || '';
 
+    // Create standalone Request record
+    const requestDoc = await Request.create({
+      foodId: donation._id,
+      ngoId: req.user._id,
+      donorId: donation.donorId,
+      ngoName,
+      coordinatorName,
+      phone,
+      isVerified: true,
+      status: 'pending',
+    });
+
+    // Also push to donation.requests for atomic backward compatibility
+    donation.requests = donation.requests || [];
     donation.requests.push({
+      _id: requestDoc._id,
       ngoId: req.user._id,
       ngoName,
       coordinatorName,
       phone,
       isVerified: true,
       status: 'pending',
-      createdAt: new Date(),
+      createdAt: requestDoc.createdAt,
+    });
+    await donation.save();
+
+    // Requirement 3: Send notification to donor
+    await sendNotification({
+      userId: donation.donorId,
+      type: 'request_received',
+      title: 'New Pickup Request',
+      message: `${ngoName} requested your food (${donation.foodName || 'Donation'}).`,
+      link: '/my-donations',
+      relatedFoodId: donation._id,
+      relatedRequestId: requestDoc._id,
     });
 
-    await donation.save();
     return res.status(201).json(publicDonation(donation, req.user));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to request pickup' });
@@ -392,17 +441,43 @@ async function cancelPickupRequest(req, res) {
       return res.status(404).json({ message: 'Food listing not found' });
     }
 
-    donation.requests = donation.requests || [];
-    const reqIndex = donation.requests.findIndex(
-      (r) => String(r.ngoId) === String(req.user._id) && r.status === 'pending'
-    );
+    const activeRequest = await Request.findOne({
+      foodId: donation._id,
+      ngoId: req.user._id,
+      status: 'pending',
+    });
 
-    if (reqIndex === -1) {
+    if (!activeRequest) {
       return res.status(400).json({ message: 'No active pickup request found to cancel' });
     }
 
-    donation.requests[reqIndex].status = 'cancelled';
+    activeRequest.status = 'cancelled';
+    await activeRequest.save();
+
+    donation.requests = donation.requests || [];
+    const reqSubdoc = donation.requests.id(activeRequest._id);
+    if (reqSubdoc) {
+      reqSubdoc.status = 'cancelled';
+    } else {
+      const idx = donation.requests.findIndex(
+        (r) => String(r.ngoId) === String(req.user._id) && r.status === 'pending'
+      );
+      if (idx !== -1) donation.requests[idx].status = 'cancelled';
+    }
     await donation.save();
+
+    const ngoName = req.user.ngoDetails?.ngoName || req.user.name || 'NGO';
+    // Notify donor of cancellation
+    await sendNotification({
+      userId: donation.donorId,
+      type: 'request_cancelled',
+      title: 'Request Cancelled',
+      message: `${ngoName} cancelled their pickup request for ${donation.foodName || 'Donation'}.`,
+      link: '/my-donations',
+      relatedFoodId: donation._id,
+      relatedRequestId: activeRequest._id,
+    });
+
     return res.json(publicDonation(donation, req.user));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to cancel pickup request' });
@@ -425,22 +500,41 @@ async function acceptRequest(req, res) {
     }
 
     const { requestId } = req.params;
-    donation.requests = donation.requests || [];
-    const targetRequest = donation.requests.id(requestId);
 
-    if (!targetRequest) {
+    // Find in Request collection
+    const targetRequest = await Request.findById(requestId);
+    if (!targetRequest || String(targetRequest.foodId) !== String(donation._id)) {
       return res.status(404).json({ message: 'Pickup request not found' });
     }
     if (targetRequest.status !== 'pending') {
       return res.status(400).json({ message: `This request is already ${targetRequest.status}` });
     }
 
-    // Accept this request
     targetRequest.status = 'accepted';
+    await targetRequest.save();
 
-    // Close all other requests on this listing
+    // Close all other pending requests on this food in Request collection
+    const otherPending = await Request.find({
+      foodId: donation._id,
+      _id: { $ne: targetRequest._id },
+      status: 'pending',
+    });
+
+    await Request.updateMany(
+      {
+        foodId: donation._id,
+        _id: { $ne: targetRequest._id },
+        status: 'pending',
+      },
+      { status: 'closed' }
+    );
+
+    // Sync subdocuments on donation
+    donation.requests = donation.requests || [];
     for (const r of donation.requests) {
-      if (String(r._id) !== String(requestId) && r.status === 'pending') {
+      if (String(r._id) === String(targetRequest._id)) {
+        r.status = 'accepted';
+      } else if (r.status === 'pending') {
         r.status = 'closed';
       }
     }
@@ -457,6 +551,31 @@ async function acceptRequest(req, res) {
     donation.bookedAt = new Date();
 
     await donation.save();
+
+    // Notify accepted NGO
+    await sendNotification({
+      userId: targetRequest.ngoId,
+      type: 'request_accepted',
+      title: 'Pickup Request Accepted!',
+      message: `Your request was accepted. You can now see the donor's contact for ${donation.foodName}.`,
+      link: `/food/${donation._id}`,
+      relatedFoodId: donation._id,
+      relatedRequestId: targetRequest._id,
+    });
+
+    // Notify other competing NGOs that food went to another organization
+    for (const oth of otherPending) {
+      await sendNotification({
+        userId: oth.ngoId,
+        type: 'request_closed',
+        title: 'Food Request Update',
+        message: `The food (${donation.foodName}) was accepted by another NGO.`,
+        link: '/feed',
+        relatedFoodId: donation._id,
+        relatedRequestId: oth._id,
+      });
+    }
+
     return res.json(publicDonation(donation, req.user));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to accept request' });
@@ -475,10 +594,8 @@ async function declineRequest(req, res) {
     }
 
     const { requestId } = req.params;
-    donation.requests = donation.requests || [];
-    const targetRequest = donation.requests.id(requestId);
-
-    if (!targetRequest) {
+    const targetRequest = await Request.findById(requestId);
+    if (!targetRequest || String(targetRequest.foodId) !== String(donation._id)) {
       return res.status(404).json({ message: 'Pickup request not found' });
     }
     if (targetRequest.status !== 'pending') {
@@ -486,7 +603,26 @@ async function declineRequest(req, res) {
     }
 
     targetRequest.status = 'declined';
-    await donation.save();
+    await targetRequest.save();
+
+    donation.requests = donation.requests || [];
+    const rSub = donation.requests.id(requestId);
+    if (rSub) {
+      rSub.status = 'declined';
+      await donation.save();
+    }
+
+    // Notify NGO that donor declined request
+    await sendNotification({
+      userId: targetRequest.ngoId,
+      type: 'request_declined',
+      title: 'Pickup Request Declined',
+      message: `The donor declined your pickup request for ${donation.foodName}.`,
+      link: '/feed',
+      relatedFoodId: donation._id,
+      relatedRequestId: targetRequest._id,
+    });
+
     return res.json(publicDonation(donation, req.user));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to decline request' });
@@ -507,11 +643,25 @@ async function releaseFood(req, res) {
       return res.status(400).json({ message: 'Only accepted listings can be released' });
     }
 
+    const prevAcceptedNgoId = donation.acceptedNgo?.ngoId;
+
     donation.status = 'available';
     donation.acceptedNgo = null;
     donation.bookedByNgoName = '';
     donation.bookedAt = null;
     await donation.save();
+
+    // Notify previous NGO that food was released
+    if (prevAcceptedNgoId) {
+      await sendNotification({
+        userId: prevAcceptedNgoId,
+        type: 'listing_released',
+        title: 'Listing Released',
+        message: `The donor released the food (${donation.foodName}) back to available.`,
+        link: `/food/${donation._id}`,
+        relatedFoodId: donation._id,
+      });
+    }
 
     return res.json(publicDonation(donation, req.user));
   } catch (err) {
@@ -543,33 +693,50 @@ async function markPickedUp(req, res) {
   }
 }
 
-// Backwards compatibility function
-async function bookFood(req, res) {
+// Requirement 4: NGO profile that the donor sees
+// Only the donor who received the request can open this profile
+async function getNgoProfileForDonor(req, res) {
   try {
-    const donation = await FoodDonation.findById(req.params.id);
+    const { id, ngoId } = req.params;
+    const donation = await FoodDonation.findById(id);
     if (!donation) {
-      return res.status(404).json({ message: 'Listing not found' });
+      return res.status(404).json({ message: 'Food donation not found' });
     }
+
+    // Security check: Only the donor of this food can open the NGO profile
     if (String(donation.donorId) !== String(req.user._id)) {
-      return res.status(403).json({ message: 'Only the donor can manage this listing' });
-    }
-    if (donation.status !== 'available') {
-      return res.status(400).json({ message: 'Only available listings can be accepted' });
+      return res.status(403).json({ message: 'Only the donor who received the request can view this NGO profile' });
     }
 
-    const ngoName = (req.body.ngoName || req.body.note || '').trim();
-    donation.status = 'accepted';
-    donation.bookedByNgoName = ngoName;
-    donation.acceptedNgo = {
-      ngoName,
-      acceptedAt: new Date(),
-    };
-    donation.bookedAt = new Date();
-    await donation.save();
+    const ngo = await User.findById(ngoId);
+    if (!ngo || ngo.ngoStatus === 'none') {
+      return res.status(404).json({ message: 'NGO organization not found' });
+    }
 
-    return res.json(publicDonation(donation, req.user));
+    // Number of completed pickups (trust metric)
+    const completedPickupsCount = await FoodDonation.countDocuments({
+      status: 'pickedUp',
+      $or: [
+        { 'acceptedNgo.ngoId': ngo._id },
+        { bookedByNgoName: ngo.ngoDetails?.ngoName || ngo.name },
+      ],
+    });
+
+    const ngoDetails = ngo.ngoDetails || {};
+
+    return res.json({
+      id: ngo._id,
+      ngoName: ngoDetails.ngoName || ngo.name,
+      coordinatorName: ngoDetails.coordinatorName || ngo.name,
+      phone: ngoDetails.contactNum || ngoDetails.coordinatorPhone || ngo.mobile,
+      city: ngoDetails.city || ngo.city,
+      address: ngoDetails.address || '',
+      isVerified: ngo.ngoStatus === 'approved' && !ngo.isBlocked,
+      createdAt: ngo.createdAt,
+      completedPickupsCount,
+    });
   } catch (err) {
-    return res.status(500).json({ message: 'Failed to update listing' });
+    return res.status(500).json({ message: 'Failed to load NGO profile' });
   }
 }
 
@@ -586,7 +753,7 @@ module.exports = {
   cancelPickupRequest,
   acceptRequest,
   declineRequest,
-  bookFood,
   releaseFood,
   markPickedUp,
+  getNgoProfileForDonor,
 };

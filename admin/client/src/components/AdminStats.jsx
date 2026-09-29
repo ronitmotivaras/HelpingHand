@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Clock, BadgeCheck } from 'lucide-react';
+import { Users, Clock, BadgeCheck, Ban } from 'lucide-react';
 
 export default function AdminStats({ stats, loading }) {
   const isLoading = loading || !stats;
@@ -7,6 +7,7 @@ export default function AdminStats({ stats, loading }) {
   const displayTotalDonators = (stats?.totalDonators ?? stats?.totalUsers) ?? '—';
   const displayPendingReviews = stats?.pendingNgoReviews ?? '—';
   const displayVerifiedPartners = stats?.verifiedNgoPartners ?? '—';
+  const displayTotalBlocked = stats?.totalBlocked ?? 0;
 
   return (
     <div className="admin-stats-grid">
@@ -67,6 +68,24 @@ export default function AdminStats({ stats, loading }) {
             <div className="skeleton-box" style={{ width: '64px', height: '36px', marginTop: '4px' }} />
           ) : (
             displayVerifiedPartners
+          )}
+        </div>
+      </div>
+
+      {/* Blocked Accounts */}
+      <div className="admin-stat-card">
+        <div
+          className="admin-stat-icon-wrap"
+          style={{ background: 'var(--color-danger-bg)' }}
+        >
+          <Ban size={20} color="var(--color-danger)" strokeWidth={2} />
+        </div>
+        <div className="admin-stat-label">Blocked Accounts</div>
+        <div className="admin-stat-value" style={{ color: 'var(--color-danger)' }}>
+          {isLoading ? (
+            <div className="skeleton-box" style={{ width: '64px', height: '36px', marginTop: '4px' }} />
+          ) : (
+            displayTotalBlocked
           )}
         </div>
       </div>

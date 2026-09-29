@@ -16,6 +16,8 @@ import {
   BadgeCheck,
   Users,
   AlertCircle,
+  X,
+  Eye,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import api from '../api/axiosInstance';
@@ -57,6 +59,27 @@ export default function DonorDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed' | 'all'
   const [processingId, setProcessingId] = useState(null);
+  const [selectedNgo, setSelectedNgo] = useState(null);
+  const [loadingNgoProfile, setLoadingNgoProfile] = useState(false);
+  const [ngoModalOpen, setNgoModalOpen] = useState(false);
+
+  async function handleOpenNgoProfile(foodId, ngoId) {
+    if (!ngoId) {
+      toast.error('NGO details are not linked to an account');
+      return;
+    }
+    setLoadingNgoProfile(true);
+    setNgoModalOpen(true);
+    try {
+      const res = await api.get(`/food/${foodId}/ngo-profile/${ngoId}`);
+      setSelectedNgo(res.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load NGO profile');
+      setNgoModalOpen(false);
+    } finally {
+      setLoadingNgoProfile(false);
+    }
+  }
 
   async function loadListings() {
     setLoading(true);
@@ -399,13 +422,32 @@ export default function DonorDashboard() {
                               >
                                 <div>
                                   <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
-                                    <strong style={{ fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenNgoProfile(listing.id, req.ngoId)}
+                                      className="btn-link text-decoration-none p-0 border-0 bg-transparent text-start fw-bold"
+                                      style={{ fontSize: 'var(--text-base)', color: 'var(--color-primary)', cursor: 'pointer' }}
+                                      title="Click to view verified NGO profile"
+                                    >
                                       {req.ngoName}
-                                    </strong>
+                                    </button>
                                     <span className="badge-verified-ngo">
                                       <BadgeCheck size={13} />
                                       <span>Verified NGO</span>
                                     </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenNgoProfile(listing.id, req.ngoId)}
+                                      className="btn-hh-secondary d-inline-flex align-items-center gap-1"
+                                      style={{
+                                        fontSize: '11px',
+                                        padding: '2px 8px',
+                                        borderRadius: '12px',
+                                      }}
+                                    >
+                                      <Eye size={11} />
+                                      <span>View Profile</span>
+                                    </button>
                                   </div>
                                   <div className="d-flex align-items-center gap-3 text-muted flex-wrap" style={{ fontSize: 'var(--text-sm)' }}>
                                     <span>
@@ -478,6 +520,24 @@ export default function DonorDashboard() {
                               <BadgeCheck size={13} />
                               <span>Verified NGO</span>
                             </span>
+                            {acceptedNgo?.ngoId && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenNgoProfile(listing.id, acceptedNgo.ngoId)}
+                                className="btn-hh-secondary d-inline-flex align-items-center gap-1"
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  borderRadius: '12px',
+                                  background: '#fef3c7',
+                                  borderColor: '#fde68a',
+                                  color: '#92400e',
+                                }}
+                              >
+                                <Eye size={11} />
+                                <span>View Profile</span>
+                              </button>
+                            )}
                           </div>
 
                           <div className="d-flex align-items-center gap-3 text-muted flex-wrap" style={{ fontSize: 'var(--text-sm)' }}>
@@ -546,6 +606,208 @@ export default function DonorDashboard() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* NGO Profile Modal */}
+        {ngoModalOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+              zIndex: 1050,
+            }}
+            onClick={() => setNgoModalOpen(false)}
+          >
+            <div
+              className="hh-card"
+              style={{
+                width: '100%',
+                maxWidth: '520px',
+                padding: '24px',
+                borderRadius: '16px',
+                background: 'var(--color-surface, #ffffff)',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                border: '1px solid var(--color-border, #e2e8f0)',
+                animation: 'fadeIn 0.2s ease-out',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {loadingNgoProfile ? (
+                <div className="py-5 text-center">
+                  <div className="spinner-border text-success" role="status">
+                    <span className="visually-hidden">Loading NGO profile...</span>
+                  </div>
+                  <p className="mt-2 text-muted" style={{ fontSize: 'var(--text-sm)' }}>
+                    Loading verified profile...
+                  </p>
+                </div>
+              ) : selectedNgo ? (
+                <div>
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                      <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="mb-0" style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+                          {selectedNgo.ngoName}
+                        </h3>
+                        {selectedNgo.isVerified && (
+                          <span className="badge-verified-ngo">
+                            <BadgeCheck size={14} />
+                            <span>Verified NGO</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>
+                        Verified Community Partner Organization
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-close-custom"
+                      onClick={() => setNgoModalOpen(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-text-muted, #64748b)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                      }}
+                      title="Close"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Trust Signals Row */}
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <div
+                        className="p-3 rounded"
+                        style={{
+                          background: 'var(--color-primary-light, #e8f5e9)',
+                          border: '1px solid rgba(22, 163, 74, 0.25)',
+                        }}
+                      >
+                        <div className="d-flex align-items-center gap-1 text-success mb-1" style={{ fontSize: '12px', fontWeight: 600 }}>
+                          <CheckCircle2 size={14} />
+                          <span>Track Record</span>
+                        </div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                          {selectedNgo.completedPickupsCount ?? 0}
+                        </div>
+                        <div className="text-muted" style={{ fontSize: '11px' }}>
+                          Completed Pickups
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-6">
+                      <div
+                        className="p-3 rounded"
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid var(--color-border, #e2e8f0)',
+                        }}
+                      >
+                        <div className="d-flex align-items-center gap-1 text-muted mb-1" style={{ fontSize: '12px', fontWeight: 600 }}>
+                          <Calendar size={14} />
+                          <span>Member Since</span>
+                        </div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                          {selectedNgo.createdAt
+                            ? new Date(selectedNgo.createdAt).toLocaleDateString([], { month: 'short', year: 'numeric' })
+                            : 'Partner'}
+                        </div>
+                        <div className="text-muted" style={{ fontSize: '11px' }}>
+                          Platform Partner
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* NGO Coordinator & Contact details */}
+                  <div
+                    className="p-3 rounded mb-3"
+                    style={{ background: 'var(--color-surface-2, #f8fafc)', border: '1px solid var(--color-border, #e2e8f0)' }}
+                  >
+                    <div className="mb-2 pb-2 border-bottom d-flex justify-content-between align-items-center">
+                      <span className="text-muted" style={{ fontSize: '12px' }}>Coordinator</span>
+                      <strong style={{ fontSize: 'var(--text-sm)' }}>
+                        {selectedNgo.coordinatorName || 'Designated Representative'}
+                      </strong>
+                    </div>
+
+                    <div className="mb-2 pb-2 border-bottom d-flex justify-content-between align-items-center">
+                      <span className="text-muted" style={{ fontSize: '12px' }}>Phone Number</span>
+                      {selectedNgo.phone ? (
+                        <a
+                          href={`tel:${selectedNgo.phone}`}
+                          className="phone-link-btn d-inline-flex align-items-center gap-1"
+                          style={{
+                            background: 'var(--color-primary-light, #e8f5e9)',
+                            color: 'var(--color-primary, #16a34a)',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <Phone size={13} />
+                          <span>{selectedNgo.phone} (Tap to Call)</span>
+                        </a>
+                      ) : (
+                        <span className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>Not provided</span>
+                      )}
+                    </div>
+
+                    <div className="d-flex justify-content-between align-items-start">
+                      <span className="text-muted" style={{ fontSize: '12px' }}>Location & City</span>
+                      <div className="text-end" style={{ fontSize: 'var(--text-sm)', maxWidth: '65%' }}>
+                        <div className="fw-semibold d-flex align-items-center justify-content-end gap-1">
+                          <MapPin size={13} color="var(--color-primary)" />
+                          <span>{selectedNgo.city || 'Local area'}</span>
+                        </div>
+                        {selectedNgo.address && (
+                          <div className="text-muted small mt-1">
+                            {selectedNgo.address}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="d-flex align-items-center gap-2 p-2 rounded text-muted mb-3" style={{ background: '#f1f5f9', fontSize: '11px' }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                    <span>
+                      Private contact info shown only to you because this NGO has an active pickup request on your food.
+                    </span>
+                  </div>
+
+                  <div className="d-flex justify-content-end">
+                    <button
+                      type="button"
+                      className="btn-hh-secondary"
+                      onClick={() => setNgoModalOpen(false)}
+                      style={{ padding: '6px 16px', fontSize: 'var(--text-sm)' }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-4 text-center text-muted">
+                  NGO profile details could not be loaded.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>

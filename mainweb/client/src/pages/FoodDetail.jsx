@@ -331,11 +331,23 @@ export default function FoodDetail() {
                     </div>
                   )
                 ) : isPendingNgo ? (
-                  <div className="d-flex align-items-center gap-2 text-warning">
-                    <Clock size={18} color="#d97706" className="flex-shrink-0" />
-                    <span style={{ fontSize: 'var(--text-sm)', color: '#92400e' }}>
-                      <strong>Waiting for verification:</strong> Only verified NGOs can request pickups. Your application is under admin review.
-                    </span>
+                  <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div className="d-flex align-items-center gap-2">
+                      <Clock size={18} color="#d97706" className="flex-shrink-0" />
+                      <span style={{ fontSize: 'var(--text-sm)', color: '#92400e' }}>
+                        <strong>Waiting for verification:</strong> Only verified NGOs can request pickups. Your application is under admin review.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-hh-primary d-inline-flex align-items-center gap-2"
+                      style={{ padding: '9px 20px', fontSize: 'var(--text-base)', opacity: 0.5, cursor: 'not-allowed' }}
+                      disabled
+                      title="Your NGO account is waiting for admin verification"
+                    >
+                      <Send size={16} />
+                      <span>Request Pickup</span>
+                    </button>
                   </div>
                 ) : (
                   <div className="d-flex align-items-center gap-2 text-muted">

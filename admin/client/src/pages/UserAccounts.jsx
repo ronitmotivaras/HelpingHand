@@ -6,6 +6,7 @@ import {
   Search,
   AlertTriangle,
   MapPin,
+  Ban,
 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import api from '../api/axiosInstance';
@@ -14,6 +15,7 @@ import { validateMobile, validatePassword } from '../utils/validation';
 
 export default function UserAccounts() {
   const [users, setUsers] = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
@@ -25,6 +27,11 @@ export default function UserAccounts() {
   const [passwordErrors, setPasswordErrors] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Block Modal State
+  const [blockingUser, setBlockingUser] = useState(null);
+  const [blockReason, setBlockReason] = useState('Policy violation / spam activity');
+  const [isBlocking, setIsBlocking] = useState(false);
+
   // Delete Confirmation Modal State
   const [deletingUser, setDeletingUser] = useState(null);
   const [blockPhoneChecked, setBlockPhoneChecked] = useState(false);
@@ -33,8 +40,12 @@ export default function UserAccounts() {
   async function loadUsers() {
     setLoading(true);
     try {
-      const res = await api.get('/api/admin/users?type=donator');
-      setUsers(res.data);
+      const [usersRes, statsRes] = await Promise.all([
+        api.get('/api/admin/users?type=donator'),
+        api.get('/api/admin/stats'),
+      ]);
+      setUsers(usersRes.data);
+      setStats(statsRes.data);
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to load donator accounts');
@@ -152,6 +163,24 @@ export default function UserAccounts() {
     }
   }
 
+  async function confirmBlockUser() {
+    if (!blockingUser) return;
+    setIsBlocking(true);
+    try {
+      await api.post(`/api/admin/users/${blockingUser.id}/block`, {
+        reason: blockReason.trim() || 'Account blocked by admin',
+      });
+      toast.success(`Donator "${blockingUser.name}" has been blocked and moved to the blocklist`);
+      setBlockingUser(null);
+      await loadUsers();
+    } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
+      toast.error(err.response?.data?.message || 'Failed to block user');
+    } finally {
+      setIsBlocking(false);
+    }
+  }
+
   const filteredUsers = (users || []).filter((u) => {
     const term = search.toLowerCase();
     const matchesSearch =
@@ -165,7 +194,11 @@ export default function UserAccounts() {
 
   return (
     <div className="admin-layout">
-      <AdminSidebar usersCount={users ? users.length : undefined} />
+      <AdminSidebar
+        pendingCount={stats?.pendingNgoReviews}
+        usersCount={stats?.totalDonators ?? (users ? users.length : undefined)}
+        blockedCount={stats?.totalBlocked}
+      />
 
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
@@ -268,13 +301,28 @@ export default function UserAccounts() {
                             <button
                               className="btn-admin-outline d-inline-flex align-items-center gap-1"
                               onClick={() => openEditModal(user)}
+                              title="Edit user credentials"
                             >
                               <Pencil size={14} />
                               <span>Edit</span>
                             </button>
                             <button
+                              type="button"
+                              className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                              style={{ color: '#b91c1c', borderColor: '#fca5a5' }}
+                              onClick={() => {
+                                setBlockingUser(user);
+                                setBlockReason('Policy violation / spam activity');
+                              }}
+                              title="Block this donor account and move to blocklist"
+                            >
+                              <Ban size={14} />
+                              <span>Block</span>
+                            </button>
+                            <button
                               className="btn-admin-danger d-inline-flex align-items-center gap-1"
                               onClick={() => openDeleteModal(user)}
+                              title="Delete user"
                             >
                               <Trash2 size={14} />
                               <span>Delete</span>
@@ -495,6 +543,99 @@ export default function UserAccounts() {
                   disabled={isDeleting}
                 >
                   {isDeleting ? 'Deleting...' : 'Yes, Delete Account'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Block Donator Confirmation Modal */}
+        {blockingUser && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.45)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1050,
+              padding: '16px',
+            }}
+            onClick={() => !isBlocking && setBlockingUser(null)}
+          >
+            <div
+              className="admin-edit-box"
+              style={{
+                maxWidth: '480px',
+                width: '100%',
+                background: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-lg)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-6)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center gap-2 mb-2" style={{ color: 'var(--color-danger)' }}>
+                <Ban size={22} />
+                <h3 className="card-title m-0" style={{ fontSize: '18px', color: 'var(--color-danger)' }}>
+                  Block Donor Account
+                </h3>
+              </div>
+
+              <p className="text-muted mb-3" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to block <strong>"{blockingUser.name}"</strong> ({blockingUser.mobile})?
+              </p>
+
+              <div
+                className="p-3 mb-3 rounded"
+                style={{
+                  background: 'var(--color-danger-bg)',
+                  border: '1px solid var(--color-danger-border)',
+                  fontSize: 'var(--text-sm)',
+                  color: '#991b1b',
+                }}
+              >
+                <ul className="mb-0 ps-3">
+                  <li>Active sessions are terminated immediately</li>
+                  <li>Login attempt will show: <em>"Your account has been blocked by admin. Please contact support."</em></li>
+                  <li>Phone number cannot be used to register again</li>
+                  <li>Listings are hidden from the platform until unblocked or deleted</li>
+                </ul>
+              </div>
+
+              <div className="mb-4">
+                <label className="form-label" htmlFor="block-reason" style={{ fontSize: '13px', fontWeight: 600 }}>
+                  Reason for blocking (Admin note)
+                </label>
+                <input
+                  id="block-reason"
+                  type="text"
+                  className="admin-form-input"
+                  value={blockReason}
+                  onChange={(e) => setBlockReason(e.target.value)}
+                  placeholder="e.g. Inappropriate behavior, spam listings, no show..."
+                  required
+                />
+              </div>
+
+              <div className="d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  className="btn-admin-outline"
+                  onClick={() => setBlockingUser(null)}
+                  disabled={isBlocking}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-admin-danger d-inline-flex align-items-center gap-1"
+                  onClick={confirmBlockUser}
+                  disabled={isBlocking}
+                >
+                  <Ban size={15} />
+                  <span>{isBlocking ? 'Blocking...' : 'Block Account'}</span>
                 </button>
               </div>
             </div>

@@ -9,6 +9,7 @@ import FoodDetail from './pages/FoodDetail';
 import DonateFood from './pages/DonateFood';
 import Profile from './pages/Profile';
 import ChangePassword from './pages/ChangePassword';
+import Notifications from './pages/Notifications';
 import { useAuth } from './context/AuthContext';
 import './App.css';
 
@@ -76,6 +77,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ChangePassword />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <Notifications />
           </ProtectedRoute>
         }
       />

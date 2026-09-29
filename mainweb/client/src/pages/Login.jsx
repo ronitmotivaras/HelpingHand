@@ -15,12 +15,18 @@ export default function Login() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  const isBlockedFromUrl = location.search.includes('blocked=1');
+  const [blockedWarning, setBlockedWarning] = useState(
+    isBlockedFromUrl ? 'Your account has been blocked by admin. Please contact support.' : ''
+  );
+
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 
   function handleMobileChange(val) {
     setMobile(val);
+    setBlockedWarning('');
     if (/[^0-9]/.test(val)) {
       setFieldErrors((prev) => ({ ...prev, mobile: 'Only numbers (0-9) are allowed. No characters, symbols, or spaces.' }));
     } else if (val.length > 0 && val.length !== 10) {
@@ -32,6 +38,7 @@ export default function Login() {
 
   function handlePasswordChange(val) {
     setPassword(val);
+    setBlockedWarning('');
     if (fieldErrors.password) {
       setFieldErrors((prev) => ({ ...prev, password: '' }));
     }
@@ -59,13 +66,21 @@ export default function Login() {
     }
 
     setFieldErrors({});
+    setBlockedWarning('');
     setLoading(true);
     try {
       await login(mobile.trim(), password);
       toast.success('Welcome back to HelpingHand!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Incorrect mobile number or password');
+      const msg = err.response?.data?.message || 'Incorrect mobile number or password';
+      if (err.response?.status === 403 || err.response?.data?.isBlocked || msg.includes('blocked')) {
+        const blockMsg = 'Your account has been blocked by admin. Please contact support.';
+        setBlockedWarning(blockMsg);
+        toast.error(blockMsg);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -79,6 +94,23 @@ export default function Login() {
           <h1 className="section-title mb-0" style={{ color: 'var(--color-primary)' }}>HelpingHand</h1>
         </div>
         <p className="food-card-meta mb-4">Community surplus food rescue network.</p>
+
+        {blockedWarning && (
+          <div
+            className="alert alert-danger d-flex align-items-center gap-2 mb-3"
+            style={{
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 'var(--text-sm)',
+              padding: '10px 14px',
+              backgroundColor: '#fee2e2',
+              borderColor: '#fca5a5',
+              color: '#991b1b',
+            }}
+          >
+            <AlertCircle size={18} className="flex-shrink-0" />
+            <span><strong>Access Blocked:</strong> {blockedWarning}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group mb-3">

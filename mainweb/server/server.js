@@ -8,6 +8,7 @@ const startExpireListingsJob = require('./jobs/expireListings');
 const authRoutes = require('./routes/auth');
 const donationRoutes = require('./routes/donations');
 const profileRoutes = require('./routes/profile');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/food', donationRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Not found' });

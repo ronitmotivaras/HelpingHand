@@ -36,6 +36,7 @@ function formatDate(dateStr) {
 
 export default function NgoVerification() {
   const [ngos, setNgos] = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
 
@@ -59,8 +60,12 @@ export default function NgoVerification() {
   async function loadNgos() {
     setLoading(true);
     try {
-      const res = await api.get('/api/admin/ngo-requests');
+      const [res, statsRes] = await Promise.all([
+        api.get('/api/admin/ngo-requests'),
+        api.get('/api/admin/stats'),
+      ]);
       setNgos(res.data);
+      setStats(statsRes.data);
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to load NGO list');
@@ -88,15 +93,17 @@ export default function NgoVerification() {
     }
   }
 
-  // Action 2: Decline NGO (Doubtful, but not proven fake - reversible)
+  // Action 2: Decline (Block) NGO -> moves to unified blocklist
   async function confirmDeclineAction() {
     if (!declineModalItem) return;
     const { id, name } = declineModalItem;
     setProcessingId(id);
     setDeclineModalItem(null);
     try {
-      await api.patch(`/api/admin/ngo-requests/${id}/reject`);
-      toast.success(`"${name}" application was declined. They can still log in as a normal donor.`);
+      await api.patch(`/api/admin/ngo-requests/${id}/reject`, {
+        reason: 'NGO application declined / blocked by admin',
+      });
+      toast.success(`"${name}" was declined and moved to the Blocked Accounts list.`);
       await loadNgos();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
@@ -215,7 +222,11 @@ export default function NgoVerification() {
 
   return (
     <div className="admin-layout">
-      <AdminSidebar pendingCount={pendingCount} />
+      <AdminSidebar
+        pendingCount={pendingCount}
+        usersCount={stats?.totalDonators}
+        blockedCount={stats?.totalBlocked}
+      />
 
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
@@ -708,17 +719,17 @@ export default function NgoVerification() {
               <div className="d-flex align-items-center gap-2 mb-2" style={{ color: '#b45309' }}>
                 <AlertTriangle size={22} />
                 <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
-                  Decline NGO Application
+                  Decline NGO Application (Block)
                 </h3>
               </div>
               <p className="text-muted mb-3" style={{ fontSize: '14px', lineHeight: 1.5 }}>
-                Are you sure you want to decline <strong>"{declineModalItem.name}"</strong>?
+                Are you sure you want to decline and block <strong>"{declineModalItem.name}"</strong>?
               </p>
               <div
                 className="p-3 mb-4 rounded"
                 style={{ background: '#fef3c7', border: '1px solid #fde68a', fontSize: '13px', color: '#92400e' }}
               >
-                <strong>Note:</strong> This action is <strong>reversible</strong>. NGO pickup features will stay locked, but the applicant can still log in as a normal community donor. If you wish to permanently delete fraud accounts, use <em>Delete</em> instead.
+                <strong>Unified Blocklist Policy:</strong> Declining an NGO automatically moves it to the shared <strong>Blocked Accounts</strong> list, logs out active sessions, and cancels open pickup requests. You can unblock this organization on the Blocked page at any time to return it to Pending.
               </div>
 
               <div className="d-flex justify-content-end gap-2">
@@ -735,7 +746,7 @@ export default function NgoVerification() {
                   style={{ backgroundColor: '#b45309', borderColor: '#b45309' }}
                   onClick={confirmDeclineAction}
                 >
-                  Confirm Decline
+                  Confirm Decline (Block)
                 </button>
               </div>
             </div>

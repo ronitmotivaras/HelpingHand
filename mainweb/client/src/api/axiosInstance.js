@@ -20,5 +20,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export default api;
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 403 && error.response?.data?.isBlocked) {
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('hh_user');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login?blocked=1';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
+export default api;

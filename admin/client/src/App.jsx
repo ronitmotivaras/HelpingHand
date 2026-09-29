@@ -5,6 +5,7 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import NgoVerification from './pages/NgoVerification';
 import UserAccounts from './pages/UserAccounts';
+import BlockedAccounts from './pages/BlockedAccounts';
 import ChangePassword from './pages/ChangePassword';
 import './admin.css';
 
@@ -49,6 +50,22 @@ export default function App() {
         element={
           <ProtectedRoute>
             <UserAccounts />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/blocked"
+        element={
+          <ProtectedRoute>
+            <BlockedAccounts />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/blocked-accounts"
+        element={
+          <ProtectedRoute>
+            <BlockedAccounts />
           </ProtectedRoute>
         }
       />

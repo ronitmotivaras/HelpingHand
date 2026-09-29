@@ -11,6 +11,7 @@ function sanitizeUser(user) {
     city: user.city,
     ngoStatus: user.ngoStatus,
     ngoDetails: user.ngoDetails,
+    isBlocked: Boolean(user.isBlocked),
     createdAt: user.createdAt,
   };
 }
@@ -187,6 +188,14 @@ async function login(req, res) {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       return res.status(401).json({ message: 'Incorrect mobile number or password' });
+    }
+
+    const phoneBlocked = await BlockedPhone.findOne({ phone: user.mobile });
+    if (user.isBlocked || phoneBlocked) {
+      return res.status(403).json({
+        message: 'Your account has been blocked by admin. Please contact support.',
+        isBlocked: true,
+      });
     }
 
     const token = jwt.sign({ type: 'user', id: user._id }, process.env.USER_JWT_SECRET, {
