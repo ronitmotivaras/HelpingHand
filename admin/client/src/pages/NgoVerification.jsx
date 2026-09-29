@@ -117,46 +117,44 @@ export default function NgoVerification() {
         </div>
 
         <section className="admin-card-panel">
-          {/* Header Controls: Search, City Dropdown, Status Filters */}
-          <div className="d-flex flex-column gap-3 mb-4">
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-              <div className="d-flex align-items-center gap-2 flex-wrap" style={{ flex: '1 1 340px' }}>
-                <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '340px' }}>
-                  <Search
-                    size={16}
-                    color="var(--color-text-muted)"
-                    style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-                  />
-                  <input
-                    type="text"
-                    className="admin-form-input"
-                    style={{ paddingLeft: '2.4rem' }}
-                    placeholder="Search by NGO name, coordinator, phone..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
+          {/* Header Controls: Search, City Dropdown, Count */}
+          <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+            <div className="d-flex align-items-center gap-3 flex-wrap">
+              <div style={{ position: 'relative', width: '300px', maxWidth: '100%' }}>
+                <Search
+                  size={16}
+                  color="var(--color-text-muted)"
+                  style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+                />
+                <input
+                  type="text"
+                  className="admin-form-input"
+                  style={{ paddingLeft: '2.4rem' }}
+                  placeholder="Search by name, phone, city..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
 
-                {/* City Dropdown Filter */}
-                <div style={{ minWidth: '180px' }}>
-                  <select
-                    className="admin-form-input"
-                    value={cityFilter}
-                    onChange={(e) => setCityFilter(e.target.value)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <option value="">All Cities</option>
-                    {CITIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* City Dropdown Filter */}
+              <div style={{ width: '170px' }}>
+                <select
+                  className="admin-form-input"
+                  value={cityFilter}
+                  onChange={(e) => setCityFilter(e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <option value="">All Cities</option>
+                  {CITIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            <span className="text-muted" style={{ fontSize: 'var(--text-small)' }}>
+            <span className="text-muted" style={{ fontSize: 'var(--text-small)', whiteSpace: 'nowrap' }}>
               Showing <strong>{filteredNgos.length}</strong> of {ngos ? ngos.length : 0} NGOs
             </span>
           </div>

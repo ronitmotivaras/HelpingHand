@@ -161,8 +161,8 @@ export default function UserAccounts() {
 
         <section className="admin-card-panel">
           <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <div className="d-flex align-items-center gap-2 flex-wrap" style={{ flex: '1 1 340px' }}>
-              <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '340px' }}>
+            <div className="d-flex align-items-center gap-3 flex-wrap">
+              <div style={{ position: 'relative', width: '300px', maxWidth: '100%' }}>
                 <Search
                   size={16}
                   color="var(--color-text-muted)"
@@ -179,7 +179,7 @@ export default function UserAccounts() {
               </div>
 
               {/* City Filter Dropdown */}
-              <div style={{ position: 'relative', minWidth: '180px' }}>
+              <div style={{ width: '170px' }}>
                 <select
                   className="admin-form-input"
                   value={selectedCity}
@@ -196,7 +196,7 @@ export default function UserAccounts() {
               </div>
             </div>
 
-            <span className="text-muted" style={{ fontSize: 'var(--text-small)' }}>
+            <span className="text-muted" style={{ fontSize: 'var(--text-small)', whiteSpace: 'nowrap' }}>
               Showing <strong>{filteredUsers.length}</strong> of {users ? users.length : 0} donators
             </span>
           </div>

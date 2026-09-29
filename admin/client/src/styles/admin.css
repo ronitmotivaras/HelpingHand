@@ -131,29 +131,17 @@ h1, h2, h3, h4, h5, h6 {
 .admin-sidebar-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding-bottom: var(--space-5);
+  gap: 8px;
+  padding-bottom: var(--space-4);
   margin-bottom: var(--space-4);
   border-bottom: 1px solid rgba(255,255,255,0.1);
   cursor: pointer;
   position: relative;
 }
 
-.sidebar-brand-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border: 1px solid rgba(255,255,255,0.18);
-}
-
 .brand-name {
   font-family: var(--font-heading);
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.02em;
@@ -162,16 +150,15 @@ h1, h2, h3, h4, h5, h6 {
 .brand-tag {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   background: rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.85);
-  padding: 2px 8px;
+  color: var(--color-accent);
+  padding: 2px 7px;
   border-radius: var(--radius-full);
   text-transform: uppercase;
   border: 1px solid rgba(255,255,255,0.2);
-  display: block;
-  width: fit-content;
-  margin-top: 2px;
+  display: inline-block;
+  margin-left: 2px;
 }
 
 /* Nav */
@@ -254,8 +241,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Sidebar footer */
 .admin-sidebar-footer {
-  padding-top: var(--space-4);
-  border-top: 1px solid rgba(255,255,255,0.1);
+  display: none;
 }
 
 /* ─── Main Content ──────────────────────────────────────── */

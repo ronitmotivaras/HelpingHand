@@ -28,9 +28,7 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
           className="admin-mobile-brand"
           onClick={() => navigate('/dashboard')}
         >
-          <div className="sidebar-brand-icon">
-            <Leaf size={18} color="#86EFAC" strokeWidth={2.5} />
-          </div>
+          <Leaf size={20} color="#86EFAC" strokeWidth={2.5} />
           <span className="brand-name">HelpingHand</span>
           <span className="brand-tag">Admin</span>
         </div>
@@ -76,16 +74,10 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
               setMobileOpen(false);
             }}
           >
-            <div className="sidebar-brand-icon">
-              <Leaf size={20} color="#86EFAC" strokeWidth={2.5} />
-            </div>
-            <div>
-              <div className="brand-name">HelpingHand</div>
-              <span className="brand-tag">Admin</span>
-            </div>
+            <Leaf size={22} color="#86EFAC" strokeWidth={2.5} />
+            <span className="brand-name">HelpingHand</span>
+            <span className="brand-tag">Admin</span>
           </div>
-
-          <div className="sidebar-section-label">Navigation</div>
 
           <ul className="admin-nav">
             <li>
@@ -152,8 +144,6 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
             </li>
           </ul>
         </div>
-
-        <div className="admin-sidebar-footer" />
       </aside>
 
       {/* Fixed top-right logout button for desktop */}
