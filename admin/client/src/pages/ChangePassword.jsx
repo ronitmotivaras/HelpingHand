@@ -59,6 +59,8 @@ export default function ChangePassword() {
       setNewPasswordErrors([]);
       setConfirmError('');
     } catch (err) {
+      if (err.name === 'CanceledError' || err.message === 'Session expired') return;
+      if (err.response?.status === 401 && err.response?.data?.message !== 'Current password is incorrect') return;
       toast.error(err.response?.data?.message || 'Failed to update password');
     } finally {
       setIsSaving(false);

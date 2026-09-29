@@ -32,6 +32,7 @@ export default function NgoVerification() {
       const res = await api.get('/api/admin/ngo-requests');
       setNgos(res.data);
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to load NGO list');
     } finally {
       setLoading(false);
@@ -49,6 +50,7 @@ export default function NgoVerification() {
       toast.success(`"${ngoName || 'NGO'}" approved as a verified partner`);
       await loadNgos();
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to approve NGO request');
     } finally {
       setProcessingId(null);
@@ -69,6 +71,7 @@ export default function NgoVerification() {
       toast.success(`Verification status for "${name}" was updated`);
       await loadNgos();
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to update NGO status');
     } finally {
       setProcessingId(null);

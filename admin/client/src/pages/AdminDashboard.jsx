@@ -25,6 +25,7 @@ export default function AdminDashboard() {
       setStats(statsRes.data);
       setRequests(ngoRes.data);
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to load live admin data');
     } finally {
       setLoading(false);
@@ -42,6 +43,7 @@ export default function AdminDashboard() {
       toast.success(`"${ngoName || 'NGO'}" verified successfully`);
       await loadData();
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to approve NGO');
     } finally {
       setProcessingNgoId(null);
@@ -62,6 +64,7 @@ export default function AdminDashboard() {
       toast.success(`Verification request for "${name}" declined`);
       await loadData();
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to decline NGO');
     } finally {
       setProcessingNgoId(null);

@@ -35,6 +35,7 @@ export default function UserAccounts() {
       const res = await api.get('/api/admin/users?type=donator');
       setUsers(res.data);
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to load donator accounts');
     } finally {
       setLoading(false);
@@ -108,6 +109,7 @@ export default function UserAccounts() {
       closeEditModal();
       await loadUsers();
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to update donator credentials');
     } finally {
       setIsSaving(false);
@@ -131,6 +133,7 @@ export default function UserAccounts() {
       closeDeleteModal();
       await loadUsers();
     } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to delete donator');
     } finally {
       setIsDeleting(false);
