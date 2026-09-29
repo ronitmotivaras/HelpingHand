@@ -12,7 +12,7 @@ const foodDonationSchema = new mongoose.Schema({
   city: { type: String, required: true, trim: true },
   status: {
     type: String,
-    enum: ['available', 'accepted', 'picked_up', 'expired'],
+    enum: ['available', 'booked', 'pickedUp', 'expired', 'accepted', 'picked_up'],
     default: 'available',
   },
   createdAt: { type: Date, default: Date.now },

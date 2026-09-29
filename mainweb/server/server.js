@@ -26,6 +26,7 @@ app.get(['/api/health', '/health'], (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/donations', donationRoutes);
+app.use('/api/food', donationRoutes);
 app.use('/api/profile', profileRoutes);
 
 app.use((req, res) => {

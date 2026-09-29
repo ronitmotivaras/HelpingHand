@@ -1,34 +1,38 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Package, Clock, ArrowRight } from 'lucide-react';
+import { MapPin, Package, Clock, Calendar, ArrowRight, Flame } from 'lucide-react';
 
-function getBadgeClass(status) {
-  if (status === 'accepted') return 'badge-status accepted';
-  if (status === 'available') return 'badge-status available';
-  if (status === 'expired') return 'badge-status expired';
-  return 'badge-status picked_up';
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
-function statusLabel(status) {
-  if (status === 'accepted') return 'Accepted';
-  if (status === 'available') return 'Available';
-  if (status === 'picked_up') return 'Picked Up';
-  if (status === 'expired') return 'Expired';
-  return status;
+function isExpiringSoon(expiryDateStr) {
+  if (!expiryDateStr) return false;
+  const exp = new Date(expiryDateStr).getTime();
+  const now = Date.now();
+  const diffHours = (exp - now) / (1000 * 60 * 60);
+  return diffHours > 0 && diffHours <= 3;
 }
 
 export default function FoodCard({ donation }) {
-  const badgeClass = getBadgeClass(donation.status);
   const isNonVeg =
     donation.foodType?.toLowerCase().includes('non') ||
     donation.type?.toLowerCase().includes('non');
+  const urgent = isExpiringSoon(donation.expiryAt);
 
   return (
     <Link to={`/food/${donation.id}`} className="text-decoration-none">
       <article className="food-card">
-        {/* Top row: title + badge */}
+        {/* Top row: title + diet symbol + urgent badge */}
         <div className="food-card-top">
-          <div className="d-flex align-items-center gap-2">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
             <span
               className={`diet-symbol ${isNonVeg ? 'non-veg' : 'veg'}`}
               title={isNonVeg ? 'Non-Vegetarian' : 'Vegetarian'}
@@ -37,17 +41,37 @@ export default function FoodCard({ donation }) {
             </span>
             <h3 className="food-card-title">{donation.foodName}</h3>
           </div>
-          <span className={badgeClass}>{statusLabel(donation.status)}</span>
+          {urgent && (
+            <span className="badge-use-quickly">
+              <Flame size={12} />
+              <span>Use quickly</span>
+            </span>
+          )}
         </div>
 
-        {/* Quantity */}
-        <div className="food-card-body">
-          <Package size={14} color="var(--color-text-muted)" />
-          <span>
-            <span style={{ color: 'var(--color-text-muted)' }}>Qty: </span>
-            <strong style={{ color: 'var(--color-text)' }}>{donation.quantity}</strong>
-          </span>
-        </div>
+        {/* Multiple items chips */}
+        {donation.items && donation.items.length > 0 ? (
+          <div className="d-flex flex-wrap gap-1 my-1">
+            {donation.items.slice(0, 3).map((it, idx) => (
+              <span className="item-chip" key={idx}>
+                <strong>{it.quantity} {it.unit}</strong> {it.name}
+              </span>
+            ))}
+            {donation.items.length > 3 && (
+              <span className="item-chip text-muted">
+                +{donation.items.length - 3} more
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="food-card-body">
+            <Package size={14} color="var(--color-text-muted)" />
+            <span>
+              <span style={{ color: 'var(--color-text-muted)' }}>Qty: </span>
+              <strong style={{ color: 'var(--color-text)' }}>{donation.quantity}</strong>
+            </span>
+          </div>
+        )}
 
         {/* Donor */}
         <div className="food-card-meta">
@@ -57,19 +81,21 @@ export default function FoodCard({ donation }) {
           </strong>
         </div>
 
-        {/* Expiry */}
-        {donation.expiryTime && (
-          <div className="food-card-meta" style={{ color: 'var(--color-warning)' }}>
-            <Clock size={13} />
-            <span>
-              Expires{' '}
-              {new Date(donation.expiryTime).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
-          </div>
-        )}
+        {/* Pickup Window */}
+        <div className="food-card-meta">
+          <Calendar size={13} color="var(--color-primary)" />
+          <span>
+            <strong>Pickup:</strong> {formatDate(donation.pickupFrom)} — {formatDate(donation.pickupTo)}
+          </span>
+        </div>
+
+        {/* Food Expiry */}
+        <div className="food-card-meta" style={{ color: urgent ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
+          <Clock size={13} />
+          <span>
+            <strong>Consume before:</strong> {formatDate(donation.expiryAt)}
+          </span>
+        </div>
 
         {/* Footer: address */}
         {donation.address && (

@@ -1,35 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Plus, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, AlertTriangle, AlertCircle, Calendar, Clock, Package } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
 import { validateMobile } from '../utils/validation';
 
+function getLocalDateTimeString(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const h = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  return `${y}-${m}-${d}T${h}:${min}`;
+}
+
+const UNIT_OPTIONS = [
+  { value: 'portions', label: 'portions' },
+  { value: 'kg', label: 'kg' },
+  { value: 'packets', label: 'packets' },
+  { value: 'pieces', label: 'pieces' },
+  { value: 'litres', label: 'litres' },
+];
+
 export default function DonateFood() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const minNow = useMemo(() => getLocalDateTimeString(), []);
+
+  // Form state
+  const [items, setItems] = useState([
+    { name: '', quantity: '', unit: 'portions' },
+  ]);
+
   const [form, setForm] = useState({
-    foodName: '',
-    quantity: '',
     foodType: 'veg',
     contactName: user?.name || '',
     phone: user?.mobile || '',
     city: user?.city || 'Ahmedabad',
-    availableUpto: '',
+    pickupFrom: '',
+    pickupTo: '',
+    expiryAt: '',
     address: '',
   });
+
   const [phoneError, setPhoneError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  function update(field, value) {
+  function updateForm(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function handlePhoneChange(val) {
-    update('phone', val);
+    updateForm('phone', val);
     if (/[^0-9]/.test(val)) {
       setPhoneError('Only numbers (0-9) are allowed. No characters, symbols, or spaces.');
     } else if (val.length > 0 && val.length !== 10) {
@@ -39,26 +66,127 @@ export default function DonateFood() {
     }
   }
 
+  // Manage multiple item rows
+  function handleItemChange(index, field, value) {
+    setItems((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  }
+
+  function handleAddItem() {
+    setItems((prev) => [...prev, { name: '', quantity: '', unit: 'portions' }]);
+  }
+
+  function handleRemoveItem(index) {
+    if (items.length <= 1) return;
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Summary calculation
+  const summary = useMemo(() => {
+    const map = {};
+    let count = 0;
+    items.forEach((it) => {
+      if (it.name.trim() && it.quantity) {
+        count++;
+        const u = it.unit || 'portions';
+        const q = parseFloat(it.quantity);
+        if (!isNaN(q) && q > 0) {
+          map[u] = (map[u] || 0) + q;
+        }
+      }
+    });
+
+    const parts = Object.entries(map).map(([u, sum]) => `${sum} ${u}`);
+    return {
+      count,
+      text: count > 0 ? `${count} item${count > 1 ? 's' : ''}: ${parts.join(' + ') || 'valid'}` : '',
+    };
+  }, [items]);
+
+  // Warning when expiry is before pickup window end
+  const expiryBeforePickupWarning = useMemo(() => {
+    if (form.pickupTo && form.expiryAt) {
+      const pTo = new Date(form.pickupTo).getTime();
+      const exp = new Date(form.expiryAt).getTime();
+      return exp < pTo;
+    }
+    return false;
+  }, [form.pickupTo, form.expiryAt]);
+
   async function handleSubmit(e) {
     e.preventDefault();
+
+    // Validate items
+    const validItems = items.filter((it) => it.name.trim() && it.quantity);
+    if (validItems.length === 0) {
+      toast.error('Please enter at least one food item with name and quantity');
+      return;
+    }
+
+    for (const it of validItems) {
+      const q = parseFloat(it.quantity);
+      if (isNaN(q) || q <= 0) {
+        toast.error(`Please enter a valid positive quantity for "${it.name}"`);
+        return;
+      }
+    }
 
     const mError = validateMobile(form.phone);
     if (mError) {
       setPhoneError(mError);
       return;
     }
+
     if (!form.city.trim()) {
       toast.error('Please select a city');
       return;
     }
 
+    if (!form.pickupFrom || !form.pickupTo || !form.expiryAt) {
+      toast.error('Please specify pickup start, pickup end, and food expiry times');
+      return;
+    }
+
+    const fromDate = new Date(form.pickupFrom);
+    const toDate = new Date(form.pickupTo);
+    const expDate = new Date(form.expiryAt);
+
+    // Rule: pickupFrom not in the past
+    if (fromDate.getTime() < Date.now() - 60000) {
+      toast.error('Pickup start time cannot be in the past');
+      return;
+    }
+
+    // Rule: pickupTo after pickupFrom
+    if (toDate.getTime() <= fromDate.getTime()) {
+      toast.error('Pickup end time must be after pickup start time');
+      return;
+    }
+
+    // Rule: expiryAt after pickupFrom
+    if (expDate.getTime() <= fromDate.getTime()) {
+      toast.error('Food expiry time must be after pickup start time');
+      return;
+    }
+
     setLoading(true);
     try {
-      await api.post('/donations', {
-        ...form,
+      // Send times as ISO strings so India/local time doesn't shift on the server
+      await api.post('/food', {
+        items: validItems,
+        foodType: form.foodType,
+        contactName: form.contactName.trim(),
         phone: form.phone.trim(),
         city: form.city.trim(),
+        address: form.address.trim(),
+        pickupFrom: fromDate.toISOString(),
+        pickupTo: toDate.toISOString(),
+        expiryAt: expDate.toISOString(),
       });
+
       toast.success('Food donation listing published successfully!');
       navigate('/');
     } catch (err) {
@@ -73,62 +201,139 @@ export default function DonateFood() {
   return (
     <>
       <Navbar />
-      <main className="hh-page" style={{ maxWidth: '680px' }}>
+      <main className="hh-page" style={{ maxWidth: '720px' }}>
         <Link
           to="/"
           className="d-inline-flex align-items-center gap-2 mb-4 text-decoration-none"
           style={{ fontSize: 'var(--text-small)', fontWeight: 600, color: 'var(--color-primary)' }}
         >
           <ArrowLeft size={16} />
-          <span>Back to listings</span>
+          <span>Back to dashboard</span>
         </Link>
 
         <div className="hh-card">
           <h1 className="section-title mb-1">List Surplus Food</h1>
           <p className="food-card-meta mb-4">
-            Helping food reach someone nearby. Location: <strong>{form.city}</strong>
+            Helping extra food reach nearby community members and relief organizations.
           </p>
 
           <form onSubmit={handleSubmit}>
-            <div className="form-group mb-3">
-              <label className="form-label" htmlFor="food-name">Food Name or Description</label>
-              <input
-                id="food-name"
-                className="form-control"
-                placeholder="e.g. 5 boxes of fresh lunch wraps, vegetable curry"
-                value={form.foodName}
-                onChange={(e) => update('foodName', e.target.value)}
-                required
-              />
+            {/* Multiple Food Items Section */}
+            <div className="mb-4">
+              <label className="form-label d-flex justify-content-between align-items-center">
+                <span>Food Items</span>
+                <span className="text-muted small" style={{ fontWeight: 400 }}>
+                  Add multiple rows if donating different food dishes
+                </span>
+              </label>
+
+              {items.map((it, idx) => (
+                <div className="item-row" key={idx}>
+                  <div style={{ flex: '1 1 50%' }}>
+                    <input
+                      className="form-control"
+                      placeholder={idx === 0 ? 'e.g. Vegetable Biryani' : 'e.g. Steamed Rice, Dal'}
+                      value={it.name}
+                      onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div style={{ width: '100px' }}>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.1"
+                      className="form-control"
+                      placeholder="Qty"
+                      value={it.quantity}
+                      onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div style={{ width: '120px' }}>
+                    <select
+                      className="form-select"
+                      value={it.unit}
+                      onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
+                    >
+                      {UNIT_OPTIONS.map((u) => (
+                        <option key={u.value} value={u.value}>
+                          {u.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      className="item-remove-btn"
+                      onClick={() => handleRemoveItem(idx)}
+                      title="Remove row"
+                      aria-label="Remove item"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-hh-secondary d-inline-flex align-items-center gap-1"
+                  style={{ padding: '6px 14px', fontSize: 'var(--text-small)' }}
+                  onClick={handleAddItem}
+                >
+                  <Plus size={15} />
+                  <span>Add another item</span>
+                </button>
+
+                {summary.text && (
+                  <div className="items-summary-box">
+                    <span className="d-flex align-items-center gap-1">
+                      <Package size={15} />
+                      <span>{summary.text}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Food Diet Category */}
             <div className="row g-3 mb-3">
-              <div className="col-sm-6 form-group">
-                <label className="form-label" htmlFor="food-quantity">Estimated Quantity</label>
-                <input
-                  id="food-quantity"
-                  className="form-control"
-                  placeholder="e.g. 10 portions, 3 kg"
-                  value={form.quantity}
-                  onChange={(e) => update('quantity', e.target.value)}
-                  required
-                />
-              </div>
-
               <div className="col-sm-6 form-group">
                 <label className="form-label" htmlFor="food-type">Food Category</label>
                 <select
                   id="food-type"
                   className="form-select"
                   value={form.foodType}
-                  onChange={(e) => update('foodType', e.target.value)}
+                  onChange={(e) => updateForm('foodType', e.target.value)}
                 >
                   <option value="veg">Vegetarian (Veg)</option>
                   <option value="nonveg">Non-Vegetarian (Non-Veg)</option>
                 </select>
               </div>
+
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="donation-city">City</label>
+                <select
+                  id="donation-city"
+                  className="form-select"
+                  value={form.city}
+                  onChange={(e) => updateForm('city', e.target.value)}
+                  required
+                >
+                  <option value="">Select City...</option>
+                  {cityOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
+            {/* Contact Person & Phone */}
             <div className="row g-3 mb-3">
               <div className="col-sm-6 form-group">
                 <label className="form-label" htmlFor="contact-name">Contact Person</label>
@@ -136,7 +341,7 @@ export default function DonateFood() {
                   id="contact-name"
                   className="form-control"
                   value={form.contactName}
-                  onChange={(e) => update('contactName', e.target.value)}
+                  onChange={(e) => updateForm('contactName', e.target.value)}
                   required
                 />
               </div>
@@ -160,47 +365,99 @@ export default function DonateFood() {
               </div>
             </div>
 
-            <div className="row g-3 mb-3">
-              <div className="col-sm-6 form-group">
-                <label className="form-label" htmlFor="donation-city">City</label>
-                <select
-                  id="donation-city"
-                  className="form-select"
-                  value={form.city}
-                  onChange={(e) => update('city', e.target.value)}
-                  required
-                >
-                  <option value="">Select City...</option>
-                  {cityOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+            {/* Timing Section: pickupFrom, pickupTo, expiryAt */}
+            <div className="p-3 mb-3 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+              <div className="fw-bold mb-2 d-flex align-items-center gap-1" style={{ color: 'var(--color-primary)' }}>
+                <Calendar size={16} />
+                <span>Pickup Window & Expiry Timing</span>
               </div>
 
-              <div className="col-sm-6 form-group">
-                <label className="form-label" htmlFor="available-upto">Available Until (Expiry / Pickup window)</label>
-                <input
-                  id="available-upto"
-                  type="datetime-local"
-                  className="form-control"
-                  value={form.availableUpto}
-                  onChange={(e) => update('availableUpto', e.target.value)}
-                  required
-                />
+              <div className="row g-3">
+                <div className="col-sm-4 form-group mb-0">
+                  <label className="form-label" htmlFor="pickup-from" style={{ fontSize: 'var(--text-xs)' }}>
+                    Pickup Starts From
+                  </label>
+                  <input
+                    id="pickup-from"
+                    type="datetime-local"
+                    min={minNow}
+                    className="form-control"
+                    value={form.pickupFrom}
+                    onChange={(e) => updateForm('pickupFrom', e.target.value)}
+                    required
+                  />
+                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                    Can be future (e.g. tomorrow)
+                  </div>
+                </div>
+
+                <div className="col-sm-4 form-group mb-0">
+                  <label className="form-label" htmlFor="pickup-to" style={{ fontSize: 'var(--text-xs)' }}>
+                    Pickup Available Until
+                  </label>
+                  <input
+                    id="pickup-to"
+                    type="datetime-local"
+                    min={form.pickupFrom || minNow}
+                    className="form-control"
+                    value={form.pickupTo}
+                    onChange={(e) => updateForm('pickupTo', e.target.value)}
+                    required
+                  />
+                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                    Window close time
+                  </div>
+                </div>
+
+                <div className="col-sm-4 form-group mb-0">
+                  <label className="form-label" htmlFor="expiry-at" style={{ fontSize: 'var(--text-xs)' }}>
+                    Consume Before (Expiry)
+                  </label>
+                  <input
+                    id="expiry-at"
+                    type="datetime-local"
+                    min={form.pickupFrom || minNow}
+                    className="form-control"
+                    value={form.expiryAt}
+                    onChange={(e) => updateForm('expiryAt', e.target.value)}
+                    required
+                  />
+                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                    Food freshness limit
+                  </div>
+                </div>
               </div>
+
+              {/* Warning if expiry is before pickupTo */}
+              {expiryBeforePickupWarning && (
+                <div
+                  className="alert alert-warning d-flex align-items-center gap-2 mt-3 mb-0"
+                  style={{
+                    backgroundColor: '#fffbeb',
+                    borderColor: '#fde68a',
+                    color: '#b45309',
+                    fontSize: 'var(--text-xs)',
+                    padding: '8px 12px',
+                  }}
+                >
+                  <AlertTriangle size={15} className="flex-shrink-0" />
+                  <span>
+                    <strong>Warning:</strong> Food freshness expiry time is earlier than the pickup end time. Ensure food remains safe for consumption!
+                  </span>
+                </div>
+              )}
             </div>
 
+            {/* Address */}
             <div className="form-group mb-4">
               <label className="form-label" htmlFor="pickup-address">Exact Pickup Address</label>
               <textarea
                 id="pickup-address"
                 className="form-control"
                 rows="3"
-                placeholder="Building, street name, landmarks..."
+                placeholder="Building name, street, nearby landmarks for NGO pickup..."
                 value={form.address}
-                onChange={(e) => update('address', e.target.value)}
+                onChange={(e) => updateForm('address', e.target.value)}
                 required
               />
             </div>

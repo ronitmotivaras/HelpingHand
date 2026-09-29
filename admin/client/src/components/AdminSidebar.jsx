@@ -144,21 +144,6 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
             </li>
           </ul>
         </div>
-
-        {/* Sidebar Footer with Sign Out */}
-        <div className="admin-sidebar-footer">
-          <button
-            type="button"
-            className="admin-sidebar-logout-btn"
-            onClick={handleLogout}
-            title="Sign out of Admin Console"
-          >
-            <span className="nav-icon">
-              <LogOut size={16} strokeWidth={2} />
-            </span>
-            <span className="nav-label">Sign Out</span>
-          </button>
-        </div>
       </aside>
 
       {/* Fixed top-right logout button for desktop */}
