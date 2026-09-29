@@ -23,6 +23,12 @@ const userSchema = new mongoose.Schema({
     default: 'none',
   },
   ngoDetails: { type: ngoDetailsSchema, default: () => ({}) },
+  adminNotes: [
+    {
+      note: { type: String, required: true, trim: true },
+      createdAt: { type: Date, default: Date.now },
+    },
+  ],
   createdAt: { type: Date, default: Date.now },
 });
 

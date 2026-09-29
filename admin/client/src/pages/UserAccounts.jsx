@@ -27,6 +27,7 @@ export default function UserAccounts() {
 
   // Delete Confirmation Modal State
   const [deletingUser, setDeletingUser] = useState(null);
+  const [blockPhoneChecked, setBlockPhoneChecked] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   async function loadUsers() {
@@ -118,18 +119,29 @@ export default function UserAccounts() {
 
   function openDeleteModal(user) {
     setDeletingUser(user);
+    setBlockPhoneChecked(false);
   }
 
   function closeDeleteModal() {
     setDeletingUser(null);
+    setBlockPhoneChecked(false);
   }
 
   async function handleConfirmDelete() {
     if (!deletingUser) return;
     setIsDeleting(true);
     try {
-      await api.delete(`/api/admin/users/${deletingUser.id}`);
-      toast.success(`Donator "${deletingUser.name}" has been removed`);
+      await api.delete(`/api/admin/users/${deletingUser.id}`, {
+        data: {
+          blockPhone: blockPhoneChecked,
+          reason: 'Fraud / fake donator account',
+        },
+      });
+      toast.success(
+        blockPhoneChecked
+          ? `Donator "${deletingUser.name}" deleted and phone blocked`
+          : `Donator "${deletingUser.name}" has been removed`
+      );
       closeDeleteModal();
       await loadUsers();
     } catch (err) {
@@ -443,9 +455,34 @@ export default function UserAccounts() {
                   Delete Donator Account
                 </h3>
               </div>
-              <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+              <p className="text-muted mb-3" style={{ fontSize: '14px', lineHeight: 1.5 }}>
                 Are you sure you want to delete donator <strong>"{deletingUser.name}"</strong>? This will remove all their profile data and associated food donation listings. <strong>This action cannot be undone.</strong>
               </p>
+
+              <div
+                className="p-3 mb-4 rounded"
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                }}
+              >
+                <label className="d-flex align-items-start gap-2 cursor-pointer m-0" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={blockPhoneChecked}
+                    onChange={(e) => setBlockPhoneChecked(e.target.checked)}
+                    style={{ marginTop: '3px', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <div>
+                    <strong style={{ color: '#991b1b', fontSize: '13px' }}>
+                      Also block this phone number ({deletingUser.mobile})
+                    </strong>
+                    <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                      Check this if this account is fraudulent to stop future registrations.
+                    </div>
+                  </div>
+                </label>
+              </div>
 
               <div className="d-flex justify-content-end gap-2">
                 <button type="button" className="btn-admin-outline" onClick={closeDeleteModal} disabled={isDeleting}>

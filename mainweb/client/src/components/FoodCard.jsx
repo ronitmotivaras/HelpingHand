@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Package, Clock, Calendar, ArrowRight, Flame } from 'lucide-react';
+import { MapPin, Package, Clock, Calendar, ArrowRight, Flame, Users } from 'lucide-react';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -30,7 +30,7 @@ export default function FoodCard({ donation }) {
   return (
     <Link to={`/food/${donation.id}`} className="text-decoration-none">
       <article className="food-card">
-        {/* Top row: title + diet symbol + urgent badge */}
+        {/* Top row: title + diet symbol + urgent badge + requested count badge */}
         <div className="food-card-top">
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <span
@@ -41,12 +41,27 @@ export default function FoodCard({ donation }) {
             </span>
             <h3 className="food-card-title">{donation.foodName}</h3>
           </div>
-          {urgent && (
-            <span className="badge-use-quickly">
-              <Flame size={12} />
-              <span>Use quickly</span>
-            </span>
-          )}
+          <div className="d-flex align-items-center gap-1 flex-wrap">
+            {donation.requestCount > 0 && (
+              <span className="ngo-requests-badge" title={`${donation.requestCount} NGO(s) requested pickup`}>
+                <Users size={12} />
+                <span>
+                  {donation.requestCount} NGO{donation.requestCount > 1 ? 's' : ''} requested
+                </span>
+              </span>
+            )}
+            {donation.hasRequested && (
+              <span className="badge-status pending" style={{ fontSize: '10px', padding: '2px 7px' }}>
+                Requested
+              </span>
+            )}
+            {urgent && (
+              <span className="badge-use-quickly">
+                <Flame size={12} />
+                <span>Use quickly</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Multiple items chips */}

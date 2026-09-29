@@ -54,6 +54,11 @@ export default function NgoRequestsTable({ requests, onApprove, onReject, proces
                 <td>
                   <strong style={{ color: 'var(--color-primary)' }}>{orgName}</strong>
                   <div className="text-muted small">ID: {req.id}</div>
+                  {req.adminNotes && req.adminNotes.length > 0 && (
+                    <div className="mt-1" style={{ fontSize: '11px', color: '#1d4ed8' }}>
+                      📌 <em>{req.adminNotes[0].note}</em>
+                    </div>
+                  )}
                 </td>
                 <td>
                   <div>{req.name}</div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   ArrowLeft,
   Phone,
@@ -9,10 +10,15 @@ import {
   UserCircle,
   Calendar,
   Flame,
-  ShieldCheck,
   Lock,
+  Users,
+  CheckCircle2,
+  XCircle,
+  Send,
+  RotateCcw,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
 
 function formatTime(value) {
@@ -35,22 +41,25 @@ function isExpiringSoon(expiryDateStr) {
 
 export default function FoodDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [donation, setDonation] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const { data } = await api.get(`/food/${id}`);
-        setDonation(data);
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to load food details');
-      } finally {
-        setLoading(false);
-      }
+  async function load() {
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/food/${id}`);
+      setDonation(data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load food details');
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     load();
   }, [id]);
 
@@ -58,10 +67,47 @@ export default function FoodDetail() {
     donation?.foodType?.toLowerCase().includes('non') || donation?.type?.toLowerCase().includes('non');
   const urgent = isExpiringSoon(donation?.expiryAt);
 
+  const isOwner = Boolean(user && donation && String(donation.donorId) === String(user.id || user._id));
+  const isNgo = Boolean(user?.ngoStatus && user.ngoStatus !== 'none');
+  const isApprovedNgo = user?.ngoStatus === 'approved';
+  const isPendingNgo = user?.ngoStatus === 'pending';
+
+  // NGO Request Pickup
+  async function handleRequestPickup() {
+    if (!isApprovedNgo) {
+      toast.error('Only verified NGOs can request pickups. Your account is waiting for verification.');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const { data } = await api.post(`/food/${id}/request`);
+      setDonation(data);
+      toast.success('Pickup request sent! The donor will review your request.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to request pickup');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  // NGO Cancel Pickup Request
+  async function handleCancelRequest() {
+    setActionLoading(true);
+    try {
+      const { data } = await api.post(`/food/${id}/cancel-request`);
+      setDonation(data);
+      toast.success('Pickup request cancelled');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to cancel request');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   return (
     <>
       <Navbar />
-      <main className="hh-page" style={{ maxWidth: '780px' }}>
+      <main className="hh-page" style={{ maxWidth: '780px', paddingBottom: '96px' }}>
         <Link
           to="/"
           className="d-inline-flex align-items-center gap-2 mb-4 text-decoration-none"
@@ -71,7 +117,7 @@ export default function FoodDetail() {
           <span>Back to dashboard</span>
         </Link>
 
-        {error && <div className="alert-danger">{error}</div>}
+        {error && <div className="alert-danger mb-4">{error}</div>}
 
         {loading && (
           <div className="hh-card">
@@ -102,6 +148,14 @@ export default function FoodDetail() {
                       <span>Use quickly</span>
                     </span>
                   )}
+                  {donation.requestCount > 0 && donation.status === 'available' && (
+                    <span className="ngo-requests-badge">
+                      <Users size={12} />
+                      <span>
+                        {donation.requestCount} NGO{donation.requestCount > 1 ? 's' : ''} requested
+                      </span>
+                    </span>
+                  )}
                 </div>
                 <p className="food-card-meta mb-0 d-flex align-items-center gap-1">
                   <MapPin size={14} />
@@ -110,8 +164,8 @@ export default function FoodDetail() {
               </div>
 
               <span className={`badge-status ${donation.status}`}>
-                {donation.status === 'booked'
-                  ? 'Booked'
+                {donation.status === 'accepted' || donation.status === 'booked'
+                  ? 'Accepted'
                   : donation.status === 'pickedUp'
                   ? 'Picked Up'
                   : donation.status === 'expired'
@@ -163,9 +217,9 @@ export default function FoodDetail() {
                 <strong>
                   <a
                     href={`tel:${donation.donorPhone}`}
-                    className="d-inline-flex align-items-center gap-1"
-                    style={{ fontWeight: 600, color: 'var(--color-primary)' }}
+                    className="phone-link-btn"
                   >
+                    <Phone size={13} />
                     <span>{donation.donorPhone}</span>
                   </a>
                 </strong>
@@ -222,15 +276,87 @@ export default function FoodDetail() {
               <strong>{donation.address}</strong>
             </div>
 
+            {/* NGO Request Action Box */}
+            {isNgo && !isOwner && donation.status === 'available' && (
+              <div
+                className="mt-4 p-4 rounded"
+                style={{
+                  background: donation.hasRequested ? '#f0fdf4' : 'var(--color-surface-2)',
+                  border: `1px solid ${donation.hasRequested ? '#86efac' : 'var(--color-border)'}`,
+                }}
+              >
+                {isApprovedNgo ? (
+                  donation.hasRequested ? (
+                    <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                      <div>
+                        <div className="d-flex align-items-center gap-2 fw-bold text-success mb-1">
+                          <CheckCircle2 size={18} />
+                          <span>Pickup Requested</span>
+                        </div>
+                        <p className="food-card-meta mb-0">
+                          Your organization has requested pickup. The donor can see your verified contact info to coordinate.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-hh-secondary d-inline-flex align-items-center gap-1"
+                        style={{ padding: '8px 16px', fontSize: 'var(--text-sm)' }}
+                        disabled={actionLoading}
+                        onClick={handleCancelRequest}
+                      >
+                        <XCircle size={16} />
+                        <span>{actionLoading ? 'Cancelling...' : 'Cancel Request'}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                      <div>
+                        <div className="fw-bold mb-1" style={{ fontSize: 'var(--text-base)' }}>
+                          Interested in collecting this food?
+                        </div>
+                        <p className="food-card-meta mb-0">
+                          Click Request Pickup to notify the donor. Several NGOs can request; the donor will coordinate by phone and accept.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-hh-primary d-inline-flex align-items-center gap-2"
+                        style={{ padding: '9px 20px', fontSize: 'var(--text-base)' }}
+                        disabled={actionLoading}
+                        onClick={handleRequestPickup}
+                      >
+                        <Send size={16} />
+                        <span>{actionLoading ? 'Submitting...' : 'Request Pickup'}</span>
+                      </button>
+                    </div>
+                  )
+                ) : isPendingNgo ? (
+                  <div className="d-flex align-items-center gap-2 text-warning">
+                    <Clock size={18} color="#d97706" className="flex-shrink-0" />
+                    <span style={{ fontSize: 'var(--text-sm)', color: '#92400e' }}>
+                      <strong>Waiting for verification:</strong> Only verified NGOs can request pickups. Your application is under admin review.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="d-flex align-items-center gap-2 text-muted">
+                    <Lock size={16} />
+                    <span style={{ fontSize: 'var(--text-sm)' }}>
+                      Only verified NGO accounts can request food pickups.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Direct connection note */}
             <div className="p-3 mt-4 rounded" style={{ background: '#FFFFFF', border: '1px solid var(--color-border)' }}>
               {donation.phoneVisible ? (
                 <p className="food-card-meta mb-0">
-                  💬 <strong>Direct Coordination:</strong> Please call the donor directly to confirm pickup ETA and necessary containers.
+                  💬 <strong>Direct Coordination:</strong> Talk by phone to agree on pickup details and containers before collection.
                 </p>
               ) : (
                 <p className="food-card-meta mb-0 text-muted">
-                  🔒 <strong>Verified NGO Access:</strong> To prevent misuse, donor contact phone numbers are visible exclusively to verified NGO partners.
+                  🔒 <strong>Verified NGO Access:</strong> To prevent fraud, donor contact numbers are accessible only to verified NGOs.
                 </p>
               )}
             </div>

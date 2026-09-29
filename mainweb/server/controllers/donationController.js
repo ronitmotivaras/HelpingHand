@@ -12,9 +12,9 @@ function publicDonation(doc, reqUser) {
   const pickupFrom = doc.pickupFrom || doc.createdAt || null;
   const expiryAt = doc.expiryAt || doc.availableUpto || pickupTo;
 
-  // Normalize status
+  // Normalize status: Available -> Accepted -> Picked up (plus Expired)
   let status = doc.status || 'available';
-  if (status === 'accepted') status = 'booked';
+  if (status === 'booked') status = 'accepted';
   if (status === 'picked_up') status = 'pickedUp';
 
   // Only approved NGOs or the donor themselves can see the contact phone
@@ -37,6 +37,61 @@ function publicDonation(doc, reqUser) {
     .map(([unit, qty]) => `${qty} ${unit}`)
     .join(' + ') || doc.quantity || '';
 
+  // Calculate active pending requests count
+  const allRequests = Array.isArray(doc.requests) ? doc.requests : [];
+  const pendingRequests = allRequests.filter((r) => r.status === 'pending');
+  const requestCount = pendingRequests.length;
+
+  // Check if reqUser is an NGO and has an active request on this listing
+  let hasRequested = false;
+  let myRequestStatus = null;
+  let myRequestId = null;
+  if (reqUser && reqUser._id) {
+    const myReq = allRequests.find((r) => String(r.ngoId) === String(reqUser._id) && r.status !== 'cancelled');
+    if (myReq) {
+      myRequestId = myReq._id;
+      myRequestStatus = myReq.status;
+      if (myReq.status === 'pending' || myReq.status === 'accepted') {
+        hasRequested = true;
+      }
+    }
+  }
+
+  // Accepted NGO details (available to owner and the accepted NGO)
+  let acceptedNgo = null;
+  if (doc.acceptedNgo && doc.acceptedNgo.ngoName) {
+    acceptedNgo = {
+      ngoId: doc.acceptedNgo.ngoId,
+      ngoName: doc.acceptedNgo.ngoName,
+      coordinatorName: doc.acceptedNgo.coordinatorName || '',
+      phone: doc.acceptedNgo.phone || '',
+      acceptedAt: doc.acceptedNgo.acceptedAt || doc.bookedAt || null,
+    };
+  } else if (doc.bookedByNgoName) {
+    acceptedNgo = {
+      ngoId: null,
+      ngoName: doc.bookedByNgoName,
+      coordinatorName: '',
+      phone: '',
+      acceptedAt: doc.bookedAt || null,
+    };
+  }
+
+  // Only the donor gets the full list of requests with contact details
+  let requests = [];
+  if (isOwner) {
+    requests = allRequests.map((r) => ({
+      id: r._id,
+      ngoId: r.ngoId,
+      ngoName: r.ngoName,
+      coordinatorName: r.coordinatorName || '',
+      phone: r.phone || '',
+      isVerified: r.isVerified !== false,
+      status: r.status,
+      createdAt: r.createdAt,
+    }));
+  }
+
   return {
     id: doc._id,
     donorId: doc.donorId,
@@ -56,7 +111,13 @@ function publicDonation(doc, reqUser) {
     address: doc.address,
     city: doc.city,
     status,
-    bookedByNgoName: doc.bookedByNgoName || '',
+    requestCount,
+    hasRequested,
+    myRequestStatus,
+    myRequestId,
+    requests,
+    acceptedNgo,
+    bookedByNgoName: acceptedNgo?.ngoName || doc.bookedByNgoName || '',
     bookedAt: doc.bookedAt || null,
     pickedUpAt: doc.pickedUpAt || null,
     createdAt: doc.createdAt,
@@ -163,11 +224,13 @@ async function createDonation(req, res) {
         }))
         .filter((it) => it.name && it.quantity);
     } else if (foodName && quantity) {
-      parsedItems = [{
-        name: String(foodName).trim(),
-        quantity: String(quantity).trim(),
-        unit: 'portions',
-      }];
+      parsedItems = [
+        {
+          name: String(foodName).trim(),
+          quantity: String(quantity).trim(),
+          unit: 'portions',
+        },
+      ];
     }
 
     if (parsedItems.length === 0) {
@@ -219,7 +282,6 @@ async function createDonation(req, res) {
       return res.status(400).json({ message: 'Invalid date or time format' });
     }
 
-    // 1-minute grace for slight network/client clock drift
     const nowWithBuffer = new Date(Date.now() - 60000);
     if (fromDate < nowWithBuffer) {
       return res.status(400).json({ message: 'Pickup start time cannot be in the past' });
@@ -238,7 +300,6 @@ async function createDonation(req, res) {
       return res.status(400).json({ message: 'City is required' });
     }
 
-    // Build summaries for legacy support
     const legacyFoodName = parsedItems.map((i) => i.name).join(', ');
     const legacyQuantity = parsedItems.map((i) => `${i.quantity} ${i.unit}`).join(', ');
 
@@ -253,10 +314,11 @@ async function createDonation(req, res) {
       pickupFrom: fromDate,
       pickupTo: toDate,
       expiryAt: expDate,
-      availableUpto: toDate, // Backwards compatibility
+      availableUpto: toDate,
       address: address.trim(),
       city: donationCity,
       status: 'available',
+      requests: [],
     });
 
     return res.status(201).json(publicDonation(donation, req.user));
@@ -265,8 +327,91 @@ async function createDonation(req, res) {
   }
 }
 
-// Donor books listing with optional NGO name note
-async function bookFood(req, res) {
+// NGO requests pickup (Only verified NGOs can request)
+async function requestPickup(req, res) {
+  try {
+    if (!req.user || req.user.ngoStatus !== 'approved') {
+      return res.status(403).json({
+        message: 'Only verified NGOs can request food pickup. Your account is waiting for verification.',
+      });
+    }
+
+    const donation = await FoodDonation.findById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ message: 'Food listing not found' });
+    }
+
+    if (String(donation.donorId) === String(req.user._id)) {
+      return res.status(400).json({ message: 'You cannot request pickup for your own food donation' });
+    }
+
+    if (donation.status !== 'available') {
+      return res.status(400).json({ message: 'This food donation is no longer available for pickup' });
+    }
+
+    const now = new Date();
+    const pickupTo = donation.pickupTo || donation.availableUpto;
+    if (pickupTo && new Date(pickupTo) < now) {
+      return res.status(400).json({ message: 'The pickup window for this listing has expired' });
+    }
+
+    donation.requests = donation.requests || [];
+    const alreadyRequested = donation.requests.find(
+      (r) => String(r.ngoId) === String(req.user._id) && r.status === 'pending'
+    );
+    if (alreadyRequested) {
+      return res.status(400).json({ message: 'You have already submitted a pickup request for this listing' });
+    }
+
+    const ngoName = req.user.ngoDetails?.ngoName || req.user.name || 'NGO';
+    const coordinatorName = req.user.ngoDetails?.coordinatorName || req.user.name || '';
+    const phone = req.user.ngoDetails?.contactNum || req.user.ngoDetails?.coordinatorPhone || req.user.mobile || '';
+
+    donation.requests.push({
+      ngoId: req.user._id,
+      ngoName,
+      coordinatorName,
+      phone,
+      isVerified: true,
+      status: 'pending',
+      createdAt: new Date(),
+    });
+
+    await donation.save();
+    return res.status(201).json(publicDonation(donation, req.user));
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to request pickup' });
+  }
+}
+
+// NGO cancels their own pickup request
+async function cancelPickupRequest(req, res) {
+  try {
+    const donation = await FoodDonation.findById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ message: 'Food listing not found' });
+    }
+
+    donation.requests = donation.requests || [];
+    const reqIndex = donation.requests.findIndex(
+      (r) => String(r.ngoId) === String(req.user._id) && r.status === 'pending'
+    );
+
+    if (reqIndex === -1) {
+      return res.status(400).json({ message: 'No active pickup request found to cancel' });
+    }
+
+    donation.requests[reqIndex].status = 'cancelled';
+    await donation.save();
+    return res.json(publicDonation(donation, req.user));
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to cancel pickup request' });
+  }
+}
+
+// Donor accepts an NGO's request:
+// Food becomes Accepted, accepted NGO is stored, and other requests are closed automatically
+async function acceptRequest(req, res) {
   try {
     const donation = await FoodDonation.findById(req.params.id);
     if (!donation) {
@@ -276,21 +421,79 @@ async function bookFood(req, res) {
       return res.status(403).json({ message: 'Only the donor can manage this listing' });
     }
     if (donation.status !== 'available') {
-      return res.status(400).json({ message: 'Only available listings can be marked as booked' });
+      return res.status(400).json({ message: 'Only available listings can accept requests' });
     }
 
-    donation.status = 'booked';
-    donation.bookedByNgoName = (req.body.ngoName || req.body.note || '').trim();
-    donation.bookedAt = new Date();
-    await donation.save();
+    const { requestId } = req.params;
+    donation.requests = donation.requests || [];
+    const targetRequest = donation.requests.id(requestId);
 
+    if (!targetRequest) {
+      return res.status(404).json({ message: 'Pickup request not found' });
+    }
+    if (targetRequest.status !== 'pending') {
+      return res.status(400).json({ message: `This request is already ${targetRequest.status}` });
+    }
+
+    // Accept this request
+    targetRequest.status = 'accepted';
+
+    // Close all other requests on this listing
+    for (const r of donation.requests) {
+      if (String(r._id) !== String(requestId) && r.status === 'pending') {
+        r.status = 'closed';
+      }
+    }
+
+    donation.status = 'accepted';
+    donation.acceptedNgo = {
+      ngoId: targetRequest.ngoId,
+      ngoName: targetRequest.ngoName,
+      coordinatorName: targetRequest.coordinatorName,
+      phone: targetRequest.phone,
+      acceptedAt: new Date(),
+    };
+    donation.bookedByNgoName = targetRequest.ngoName;
+    donation.bookedAt = new Date();
+
+    await donation.save();
     return res.json(publicDonation(donation, req.user));
   } catch (err) {
-    return res.status(500).json({ message: 'Failed to update listing' });
+    return res.status(500).json({ message: 'Failed to accept request' });
   }
 }
 
-// Donor releases booked listing back to available
+// Donor declines a single request without affecting the others
+async function declineRequest(req, res) {
+  try {
+    const donation = await FoodDonation.findById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ message: 'Listing not found' });
+    }
+    if (String(donation.donorId) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'Only the donor can manage this listing' });
+    }
+
+    const { requestId } = req.params;
+    donation.requests = donation.requests || [];
+    const targetRequest = donation.requests.id(requestId);
+
+    if (!targetRequest) {
+      return res.status(404).json({ message: 'Pickup request not found' });
+    }
+    if (targetRequest.status !== 'pending') {
+      return res.status(400).json({ message: `This request is already ${targetRequest.status}` });
+    }
+
+    targetRequest.status = 'declined';
+    await donation.save();
+    return res.json(publicDonation(donation, req.user));
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to decline request' });
+  }
+}
+
+// Donor releases accepted listing back to available
 async function releaseFood(req, res) {
   try {
     const donation = await FoodDonation.findById(req.params.id);
@@ -301,10 +504,11 @@ async function releaseFood(req, res) {
       return res.status(403).json({ message: 'Only the donor can manage this listing' });
     }
     if (donation.status !== 'booked' && donation.status !== 'accepted') {
-      return res.status(400).json({ message: 'Only booked listings can be released' });
+      return res.status(400).json({ message: 'Only accepted listings can be released' });
     }
 
     donation.status = 'available';
+    donation.acceptedNgo = null;
     donation.bookedByNgoName = '';
     donation.bookedAt = null;
     await donation.save();
@@ -339,6 +543,36 @@ async function markPickedUp(req, res) {
   }
 }
 
+// Backwards compatibility function
+async function bookFood(req, res) {
+  try {
+    const donation = await FoodDonation.findById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ message: 'Listing not found' });
+    }
+    if (String(donation.donorId) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'Only the donor can manage this listing' });
+    }
+    if (donation.status !== 'available') {
+      return res.status(400).json({ message: 'Only available listings can be accepted' });
+    }
+
+    const ngoName = (req.body.ngoName || req.body.note || '').trim();
+    donation.status = 'accepted';
+    donation.bookedByNgoName = ngoName;
+    donation.acceptedNgo = {
+      ngoName,
+      acceptedAt: new Date(),
+    };
+    donation.bookedAt = new Date();
+    await donation.save();
+
+    return res.json(publicDonation(donation, req.user));
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to update listing' });
+  }
+}
+
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -348,6 +582,10 @@ module.exports = {
   getMyHistory,
   getDonation,
   createDonation,
+  requestPickup,
+  cancelPickupRequest,
+  acceptRequest,
+  declineRequest,
   bookFood,
   releaseFood,
   markPickedUp,

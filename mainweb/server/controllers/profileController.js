@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const BlockedPhone = require('../models/BlockedPhone');
 const { sanitizeUser } = require('./authController');
 
 async function getProfile(req, res) {
@@ -24,6 +25,11 @@ async function updateProfile(req, res) {
       return res.status(400).json({ message: 'Mobile number must be exactly 10 digits (0-9 only)' });
     }
     if (trimmedMobile !== req.user.mobile) {
+      const isBlocked = await BlockedPhone.findOne({ phone: trimmedMobile });
+      if (isBlocked) {
+        return res.status(403).json({ message: 'This phone number has been blocked.' });
+      }
+
       const taken = await User.findOne({ mobile: trimmedMobile, _id: { $ne: req.user._id } });
       if (taken) {
         return res.status(409).json({ message: 'Mobile number is already registered to another account' });
@@ -83,6 +89,11 @@ async function applyNgo(req, res) {
     const cleanContact = String(contactNum).trim();
     if (!/^\d{10}$/.test(cleanContact)) {
       return res.status(400).json({ message: 'Contact number must be exactly 10 digits (0-9 only)' });
+    }
+
+    const isBlocked = await BlockedPhone.findOne({ phone: cleanContact });
+    if (isBlocked) {
+      return res.status(403).json({ message: 'This phone number has been blocked.' });
     }
 
     if (req.user.ngoStatus === 'pending') {

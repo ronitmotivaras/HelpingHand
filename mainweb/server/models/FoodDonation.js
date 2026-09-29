@@ -13,6 +13,20 @@ const foodItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const donationRequestSchema = new mongoose.Schema({
+  ngoId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  ngoName: { type: String, required: true, trim: true },
+  coordinatorName: { type: String, default: '', trim: true },
+  phone: { type: String, required: true, trim: true },
+  isVerified: { type: Boolean, default: true },
+  status: {
+    type: String,
+    enum: ['pending', 'accepted', 'declined', 'closed', 'cancelled'],
+    default: 'pending',
+  },
+  createdAt: { type: Date, default: Date.now },
+});
+
 const foodDonationSchema = new mongoose.Schema({
   donorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   donorName: { type: String, required: true, trim: true },
@@ -38,8 +52,20 @@ const foodDonationSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['available', 'booked', 'pickedUp', 'expired', 'accepted', 'picked_up'],
+    enum: ['available', 'accepted', 'pickedUp', 'expired', 'booked', 'picked_up'],
     default: 'available',
+  },
+
+  // Pickup requests from NGOs
+  requests: { type: [donationRequestSchema], default: [] },
+
+  // Stored details of accepted NGO
+  acceptedNgo: {
+    ngoId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    ngoName: { type: String, default: '' },
+    coordinatorName: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    acceptedAt: { type: Date },
   },
 
   bookedByNgoName: { type: String, default: '' },

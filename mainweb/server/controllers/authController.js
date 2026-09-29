@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const BlockedPhone = require('../models/BlockedPhone');
 
 function sanitizeUser(user) {
   return {
@@ -67,6 +68,11 @@ async function register(req, res) {
         return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
       }
 
+      const isBlocked = await BlockedPhone.findOne({ phone: finalContactNum });
+      if (isBlocked) {
+        return res.status(403).json({ message: 'This phone number has been blocked from registration.' });
+      }
+
       const existing = await User.findOne({ mobile: finalContactNum });
       if (existing) {
         return res.status(409).json({ message: 'Contact mobile number is already registered' });
@@ -117,6 +123,11 @@ async function register(req, res) {
     }
     if (/[^a-zA-Z0-9@]/.test(password)) {
       return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
+    }
+
+    const isBlocked = await BlockedPhone.findOne({ phone: trimmedMobile });
+    if (isBlocked) {
+      return res.status(403).json({ message: 'This phone number has been blocked from registration.' });
     }
 
     const existing = await User.findOne({ mobile: trimmedMobile });

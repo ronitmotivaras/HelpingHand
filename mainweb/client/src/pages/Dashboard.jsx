@@ -89,14 +89,14 @@ export default function Dashboard() {
               <>
                 <Clock size={18} className="flex-shrink-0" />
                 <span>
-                  <strong>NGO Verification Pending:</strong> Your organization profile is under review by the admin team. Once verified, donor phone numbers will be automatically unlocked for direct coordination.
+                  <strong>Waiting for verification:</strong> Your organization profile is under review by our admin team. You can browse available listings now; once verified, you will be able to request pickups directly.
                 </span>
               </>
             ) : (
               <>
                 <ShieldAlert size={18} className="flex-shrink-0" />
                 <span>
-                  <strong>Verification Declined:</strong> Your NGO verification application was not approved. Only verified NGO partners can view direct donor contact phone numbers.
+                  <strong>Verification Declined:</strong> Your NGO application was declined. You can continue browsing as a community member.
                 </span>
               </>
             )}
@@ -107,11 +107,11 @@ export default function Dashboard() {
         <div className="hh-page-header">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-              <div className="d-flex align-items-center gap-2 mb-1">
+              <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                 <h1 className="m-0">Available Food in {selectedCity}</h1>
                 {isApprovedNgo && (
-                  <span className="badge-status approved d-inline-flex align-items-center gap-1" style={{ fontSize: '11px' }}>
-                    <BadgeCheck size={13} />
+                  <span className="badge-verified-ngo">
+                    <BadgeCheck size={14} />
                     <span>Verified NGO</span>
                   </span>
                 )}

@@ -11,20 +11,50 @@ import {
   Search,
   BadgeCheck,
   Clock,
+  StickyNote,
+  Trash2,
+  RotateCcw,
+  Plus,
+  X,
+  ShieldAlert,
+  Filter,
 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
 
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function NgoVerification() {
   const [ngos, setNgos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+  const [onlyWithNotes, setOnlyWithNotes] = useState(false);
   const [cityFilter, setCityFilter] = useState('');
   const [search, setSearch] = useState('');
 
-  // Reject confirmation modal
-  const [confirmReject, setConfirmReject] = useState(null);
+  // Modals
+  const [declineModalItem, setDeclineModalItem] = useState(null); // { id, name }
+  const [noteModalItem, setNoteModalItem] = useState(null); // { id, name, notes }
+  const [noteText, setNoteText] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
+  // Delete / Fraud Modal
+  const [deleteModalItem, setDeleteModalItem] = useState(null); // { id, name, phone }
+  const [blockPhoneChecked, setBlockPhoneChecked] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function loadNgos() {
     setLoading(true);
@@ -43,44 +73,117 @@ export default function NgoVerification() {
     loadNgos();
   }, []);
 
-  async function handleApprove(id, ngoName) {
+  // Action 1: Verify NGO (Confirmed real)
+  async function handleVerify(id, ngoName) {
     setProcessingId(id);
     try {
       await api.patch(`/api/admin/ngo-requests/${id}/approve`);
-      toast.success(`"${ngoName || 'NGO'}" approved as a verified partner`);
+      toast.success(`"${ngoName || 'NGO'}" verified successfully as a partner`);
       await loadNgos();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
-      toast.error(err.response?.data?.message || 'Failed to approve NGO request');
+      toast.error(err.response?.data?.message || 'Failed to verify NGO');
     } finally {
       setProcessingId(null);
     }
   }
 
-  function promptReject(id, ngoName) {
-    setConfirmReject({ id, name: ngoName || 'this NGO' });
-  }
-
-  async function confirmRejectAction() {
-    if (!confirmReject) return;
-    const { id, name } = confirmReject;
+  // Action 2: Decline NGO (Doubtful, but not proven fake - reversible)
+  async function confirmDeclineAction() {
+    if (!declineModalItem) return;
+    const { id, name } = declineModalItem;
     setProcessingId(id);
-    setConfirmReject(null);
+    setDeclineModalItem(null);
     try {
       await api.patch(`/api/admin/ngo-requests/${id}/reject`);
-      toast.success(`Verification status for "${name}" was updated`);
+      toast.success(`"${name}" application was declined. They can still log in as a normal donor.`);
       await loadNgos();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
-      toast.error(err.response?.data?.message || 'Failed to update NGO status');
+      toast.error(err.response?.data?.message || 'Failed to decline NGO');
     } finally {
       setProcessingId(null);
+    }
+  }
+
+  // Action 3: Revert to Pending
+  async function handleSetPending(id, ngoName) {
+    setProcessingId(id);
+    try {
+      await api.patch(`/api/admin/ngo-requests/${id}/pending`);
+      toast.success(`"${ngoName || 'NGO'}" status reverted to Pending`);
+      await loadNgos();
+    } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
+      toast.error(err.response?.data?.message || 'Failed to update status');
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  // Action 4: Save Admin Note (Couldn't reach / call attempt note)
+  async function handleSaveNote(e) {
+    e.preventDefault();
+    if (!noteModalItem || !noteText.trim()) return;
+
+    setIsSavingNote(true);
+    try {
+      await api.post(`/api/admin/ngos/${noteModalItem.id}/note`, { note: noteText.trim() });
+      toast.success('Admin note saved. NGO status kept pending.');
+      setNoteModalItem(null);
+      setNoteText('');
+      await loadNgos();
+    } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
+      toast.error(err.response?.data?.message || 'Failed to save admin note');
+    } finally {
+      setIsSavingNote(false);
+    }
+  }
+
+  // Action 5: Delete NGO (Confirmed fraud / fake, with option to block phone)
+  async function handleDeleteConfirm() {
+    if (!deleteModalItem) return;
+    setIsDeleting(true);
+    try {
+      await api.delete(`/api/admin/ngos/${deleteModalItem.id}`, {
+        data: {
+          blockPhone: blockPhoneChecked,
+          reason: 'Confirmed fraud / fake NGO registration',
+        },
+      });
+      if (blockPhoneChecked) {
+        toast.success(`"${deleteModalItem.name}" deleted and phone ${deleteModalItem.phone} blocked from future registrations.`);
+      } else {
+        toast.success(`"${deleteModalItem.name}" deleted.`);
+      }
+      setDeleteModalItem(null);
+      await loadNgos();
+    } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
+      toast.error(err.response?.data?.message || 'Failed to delete NGO');
+    } finally {
+      setIsDeleting(false);
     }
   }
 
   const pendingCount = ngos ? ngos.filter((n) => n.ngoStatus === 'pending').length : 0;
+  const approvedCount = ngos ? ngos.filter((n) => n.ngoStatus === 'approved').length : 0;
+  const rejectedCount = ngos ? ngos.filter((n) => n.ngoStatus === 'rejected').length : 0;
+  const notesCount = ngos ? ngos.filter((n) => Array.isArray(n.adminNotes) && n.adminNotes.length > 0).length : 0;
 
+  // Filter pipeline
   const filteredNgos = (ngos || []).filter((ngo) => {
+    // Status filter
+    if (statusFilter !== 'all' && ngo.ngoStatus !== statusFilter) {
+      return false;
+    }
+
+    // Only with notes filter (Couldn't reach / follow up)
+    if (onlyWithNotes && (!ngo.adminNotes || ngo.adminNotes.length === 0)) {
+      return false;
+    }
+
     // City filter
     const ngoCity = ngo.ngoDetails?.city || ngo.city || '';
     if (cityFilter && ngoCity.toLowerCase() !== cityFilter.toLowerCase()) {
@@ -95,13 +198,15 @@ export default function NgoVerification() {
       const contact = (ngo.ngoDetails?.contactNum || ngo.mobile || '').toLowerCase();
       const address = (ngo.ngoDetails?.address || '').toLowerCase();
       const city = ngoCity.toLowerCase();
+      const notesCombined = (ngo.adminNotes || []).map((n) => n.note.toLowerCase()).join(' ');
 
       return (
         ngoName.includes(term) ||
         coordinator.includes(term) ||
         contact.includes(term) ||
         address.includes(term) ||
-        city.includes(term)
+        city.includes(term) ||
+        notesCombined.includes(term)
       );
     }
 
@@ -115,15 +220,135 @@ export default function NgoVerification() {
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
           <div>
-            <h1 className="admin-page-title">Registered NGOs</h1>
+            <h1 className="admin-page-title">NGO Verification & Management</h1>
           </div>
         </div>
 
         <section className="admin-card-panel">
-          {/* Header Controls: Search, City Dropdown, Count */}
-          <div className="d-flex justify-content-between align-items-center flex-wrap gap-3" style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)' }}>
+          {/* Top Filter Tabs: All / Pending / Verified / Declined / Unreachable with notes */}
+          <div
+            className="d-flex justify-content-between align-items-center flex-wrap gap-3"
+            style={{
+              padding: 'var(--space-4) var(--space-5)',
+              borderBottom: '1px solid var(--color-border-subtle)',
+              background: 'var(--color-surface-2)',
+            }}
+          >
+            {/* Status Segmented Buttons */}
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                className={`btn-admin-outline ${statusFilter === 'all' && !onlyWithNotes ? 'active' : ''}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 600,
+                  backgroundColor: statusFilter === 'all' && !onlyWithNotes ? 'var(--color-primary)' : 'transparent',
+                  color: statusFilter === 'all' && !onlyWithNotes ? '#ffffff' : 'inherit',
+                  borderColor: statusFilter === 'all' && !onlyWithNotes ? 'var(--color-primary)' : 'var(--color-border)',
+                }}
+                onClick={() => {
+                  setStatusFilter('all');
+                  setOnlyWithNotes(false);
+                }}
+              >
+                All NGOs ({ngos ? ngos.length : 0})
+              </button>
+
+              <button
+                type="button"
+                className={`btn-admin-outline ${statusFilter === 'pending' && !onlyWithNotes ? 'active' : ''}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 600,
+                  backgroundColor: statusFilter === 'pending' && !onlyWithNotes ? '#f59e0b' : 'transparent',
+                  color: statusFilter === 'pending' && !onlyWithNotes ? '#ffffff' : 'inherit',
+                  borderColor: statusFilter === 'pending' && !onlyWithNotes ? '#f59e0b' : 'var(--color-border)',
+                }}
+                onClick={() => {
+                  setStatusFilter('pending');
+                  setOnlyWithNotes(false);
+                }}
+              >
+                Pending ({pendingCount})
+              </button>
+
+              <button
+                type="button"
+                className={`btn-admin-outline ${statusFilter === 'approved' && !onlyWithNotes ? 'active' : ''}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 600,
+                  backgroundColor: statusFilter === 'approved' && !onlyWithNotes ? '#15803d' : 'transparent',
+                  color: statusFilter === 'approved' && !onlyWithNotes ? '#ffffff' : 'inherit',
+                  borderColor: statusFilter === 'approved' && !onlyWithNotes ? '#15803d' : 'var(--color-border)',
+                }}
+                onClick={() => {
+                  setStatusFilter('approved');
+                  setOnlyWithNotes(false);
+                }}
+              >
+                Verified ({approvedCount})
+              </button>
+
+              <button
+                type="button"
+                className={`btn-admin-outline ${statusFilter === 'rejected' && !onlyWithNotes ? 'active' : ''}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 600,
+                  backgroundColor: statusFilter === 'rejected' && !onlyWithNotes ? '#64748b' : 'transparent',
+                  color: statusFilter === 'rejected' && !onlyWithNotes ? '#ffffff' : 'inherit',
+                  borderColor: statusFilter === 'rejected' && !onlyWithNotes ? '#64748b' : 'var(--color-border)',
+                }}
+                onClick={() => {
+                  setStatusFilter('rejected');
+                  setOnlyWithNotes(false);
+                }}
+              >
+                Declined ({rejectedCount})
+              </button>
+
+              {/* Case B Filter: Couldn't reach / Has Notes */}
+              <button
+                type="button"
+                className={`btn-admin-outline ${onlyWithNotes ? 'active' : ''}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 600,
+                  backgroundColor: onlyWithNotes ? '#3b82f6' : 'transparent',
+                  color: onlyWithNotes ? '#ffffff' : '#2563eb',
+                  borderColor: onlyWithNotes ? '#3b82f6' : '#bfdbfe',
+                }}
+                onClick={() => {
+                  setOnlyWithNotes(!onlyWithNotes);
+                }}
+                title="Filter to find unreachable NGOs with logged call attempts"
+              >
+                <StickyNote size={14} className="me-1" />
+                <span>With Call Notes ({notesCount})</span>
+              </button>
+            </div>
+
+            <span className="text-muted" style={{ fontSize: 'var(--text-small)', whiteSpace: 'nowrap' }}>
+              Showing <strong>{filteredNgos.length}</strong> NGOs
+            </span>
+          </div>
+
+          {/* Search & City Filter Bar */}
+          <div
+            className="d-flex justify-content-between align-items-center flex-wrap gap-3"
+            style={{
+              padding: 'var(--space-4) var(--space-5)',
+              borderBottom: '1px solid var(--color-border-subtle)',
+            }}
+          >
             <div className="d-flex align-items-center gap-3 flex-wrap">
-              <div style={{ position: 'relative', width: '300px', maxWidth: '100%' }}>
+              <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
                 <Search
                   size={16}
                   color="var(--color-text-muted)"
@@ -133,13 +358,13 @@ export default function NgoVerification() {
                   type="text"
                   className="admin-form-input"
                   style={{ paddingLeft: '2.4rem' }}
-                  placeholder="Search by name, phone, city..."
+                  placeholder="Search name, phone, coordinator, notes..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
 
-              {/* City Dropdown Filter */}
+              {/* City Dropdown */}
               <div style={{ width: '170px' }}>
                 <select
                   className="admin-form-input"
@@ -157,15 +382,19 @@ export default function NgoVerification() {
               </div>
             </div>
 
-            <span className="text-muted" style={{ fontSize: 'var(--text-small)', whiteSpace: 'nowrap' }}>
-              Showing <strong>{filteredNgos.length}</strong> of {ngos ? ngos.length : 0} NGOs
-            </span>
+            {/* Quick Helper Badge */}
+            <div className="text-muted small d-none d-md-flex align-items-center gap-2">
+              <span className="badge-status approved" style={{ fontSize: '10px' }}>Verified</span>
+              <span className="badge-status pending" style={{ fontSize: '10px' }}>Pending</span>
+              <span className="badge-status rejected" style={{ fontSize: '10px' }}>Declined</span>
+            </div>
           </div>
 
+          {/* Content / NGO Cards */}
           {loading && ngos === null ? (
-            <div className="p-3">
+            <div className="p-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="mb-3 p-3 border rounded">
+                <div key={i} className="mb-3 p-4 border rounded">
                   <div className="skeleton-box mb-2" style={{ width: '40%', height: '22px' }} />
                   <div className="skeleton-box mb-2" style={{ width: '70%', height: '16px' }} />
                   <div className="skeleton-box" style={{ width: '25%', height: '16px' }} />
@@ -173,13 +402,15 @@ export default function NgoVerification() {
               ))}
             </div>
           ) : filteredNgos.length === 0 ? (
-            <div className="admin-empty-state">
+            <div className="admin-empty-state py-5 text-center">
               <div className="empty-icon mb-2">
                 <Inbox size={48} color="var(--color-text-muted)" strokeWidth={1.5} />
               </div>
               <p className="fw-semibold mb-1">No matching NGOs found.</p>
               <span className="text-muted small">
-                When relief organizations and charities register, they will be listed here.
+                {onlyWithNotes
+                  ? 'No NGOs have call notes matching this filter.'
+                  : 'Try clearing your search or city filters.'}
               </span>
             </div>
           ) : (
@@ -204,17 +435,20 @@ export default function NgoVerification() {
                   ? 'rejected'
                   : 'none';
 
+                const adminNotes = Array.isArray(ngo.adminNotes) ? ngo.adminNotes : [];
+
                 return (
                   <div
                     key={ngo.id}
                     className="p-4"
                     style={{
                       background: 'var(--color-surface)',
-                      border: '1px solid var(--color-border)',
+                      border: isPending && adminNotes.length > 0 ? '1px solid #bfdbfe' : '1px solid var(--color-border)',
                       borderRadius: 'var(--radius-md)',
                       boxShadow: 'var(--shadow-sm)',
                     }}
                   >
+                    {/* Top Row: Title, Status Badge, Action Buttons */}
                     <div className="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                       <div>
                         <div className="d-flex align-items-center gap-2 flex-wrap">
@@ -228,60 +462,141 @@ export default function NgoVerification() {
                           >
                             {ngoName}
                           </h3>
-                          <span className={`badge-status ${statusClass} d-inline-flex align-items-center gap-1`}>
-                            {isApproved && <BadgeCheck size={14} />}
-                            {isPending && <Clock size={14} />}
-                            {isRejected && <XCircle size={14} />}
-                            <span>
-                              {isApproved
-                                ? 'Verified NGO'
-                                : isPending
-                                ? 'Pending Review'
-                                : 'Declined'}
+
+                          {isApproved && (
+                            <span className="badge-status approved d-inline-flex align-items-center gap-1">
+                              <BadgeCheck size={14} />
+                              <span>Verified NGO</span>
                             </span>
-                          </span>
+                          )}
+                          {isPending && (
+                            <span className="badge-status pending d-inline-flex align-items-center gap-1">
+                              <Clock size={14} />
+                              <span>Pending Review</span>
+                            </span>
+                          )}
+                          {isRejected && (
+                            <span className="badge-status rejected d-inline-flex align-items-center gap-1">
+                              <XCircle size={14} />
+                              <span>Declined</span>
+                            </span>
+                          )}
                         </div>
-                        <div className="text-muted small mt-1">
-                          Coordinator: <strong>{coordinatorName}</strong> &bull; Contact: <strong>{contactNum}</strong>
+
+                        <div className="text-muted small mt-1 d-flex align-items-center gap-3 flex-wrap">
+                          <span>
+                            Coordinator: <strong>{coordinatorName}</strong>
+                          </span>
+                          <a
+                            href={`tel:${contactNum}`}
+                            className="phone-link-btn"
+                            title="Call coordinator to verify"
+                          >
+                            <Phone size={13} />
+                            <span>{contactNum}</span>
+                          </a>
+                          <span>Applied {formatDate(ngo.createdAt)}</span>
                         </div>
                       </div>
 
-                      <div className="d-flex gap-2">
-                        {isPending && (
-                          <>
-                            <button
-                              className="btn-admin-primary d-inline-flex align-items-center gap-1"
-                              disabled={isProcessing}
-                              onClick={() => handleApprove(ngo.id, ngoName)}
-                            >
-                              <CheckCircle2 size={16} strokeWidth={2} />
-                              <span>{isProcessing ? 'Processing...' : 'Approve'}</span>
-                            </button>
-                            <button
-                              className="btn-admin-danger d-inline-flex align-items-center gap-1"
-                              disabled={isProcessing}
-                              onClick={() => promptReject(ngo.id, ngoName)}
-                            >
-                              <XCircle size={16} strokeWidth={2} />
-                              <span>{isProcessing ? 'Processing...' : 'Reject'}</span>
-                            </button>
-                          </>
-                        )}
-                        {isApproved && (
+                      {/* Action buttons mapping to the 4 outcomes:
+                          1. Called and confirmed real -> Verify
+                          2. Couldn't reach -> Keep Pending and add a note
+                          3. Doubtful, but not proven fake -> Decline (reversible)
+                          4. Confirmed fraud -> Delete (with block number checkbox)
+                      */}
+                      <div className="d-flex gap-2 flex-wrap">
+                        {/* 1. Verify button */}
+                        {!isApproved && (
                           <button
-                            className="btn-admin-danger d-inline-flex align-items-center gap-1"
+                            type="button"
+                            className="btn-admin-primary d-inline-flex align-items-center gap-1"
+                            style={{ padding: '6px 14px', fontSize: 'var(--text-sm)' }}
                             disabled={isProcessing}
-                            onClick={() => promptReject(ngo.id, ngoName)}
-                            title="Revoke verification status"
+                            onClick={() => handleVerify(ngo.id, ngoName)}
+                            title="Confirm real organization and grant Verified NGO badge"
                           >
-                            <XCircle size={15} />
-                            <span>Revoke</span>
+                            <CheckCircle2 size={15} strokeWidth={2} />
+                            <span>Verify</span>
                           </button>
                         )}
+
+                        {/* 2. Add Note button (Keep Pending & Add Note) */}
+                        <button
+                          type="button"
+                          className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                          style={{
+                            padding: '6px 13px',
+                            fontSize: 'var(--text-sm)',
+                            color: '#2563eb',
+                            borderColor: '#bfdbfe',
+                          }}
+                          disabled={isProcessing}
+                          onClick={() => {
+                            setNoteModalItem({ id: ngo.id, name: ngoName, notes: adminNotes });
+                            setNoteText('');
+                          }}
+                          title="Case B: Couldn't reach? Keep Pending and record call attempt note"
+                        >
+                          <StickyNote size={15} />
+                          <span>{adminNotes.length > 0 ? `Notes (${adminNotes.length})` : 'Add Note'}</span>
+                        </button>
+
+                        {/* 3. Decline button (Reversible, normal donor features remain) */}
+                        {!isRejected && (
+                          <button
+                            type="button"
+                            className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                            style={{
+                              padding: '6px 13px',
+                              fontSize: 'var(--text-sm)',
+                              color: '#b45309',
+                              borderColor: '#fde68a',
+                            }}
+                            disabled={isProcessing}
+                            onClick={() => setDeclineModalItem({ id: ngo.id, name: ngoName })}
+                            title="Case 3: Doubtful, not proven fake. Decline NGO application (reversible)"
+                          >
+                            <XCircle size={15} />
+                            <span>Decline</span>
+                          </button>
+                        )}
+
+                        {/* If declined, option to revert to Pending */}
+                        {isRejected && (
+                          <button
+                            type="button"
+                            className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                            style={{ padding: '6px 13px', fontSize: 'var(--text-sm)' }}
+                            disabled={isProcessing}
+                            onClick={() => handleSetPending(ngo.id, ngoName)}
+                            title="Revert status back to Pending"
+                          >
+                            <RotateCcw size={14} />
+                            <span>Set Pending</span>
+                          </button>
+                        )}
+
+                        {/* 4. Delete button (Confirmed fraud / fake, with option to block phone) */}
+                        <button
+                          type="button"
+                          className="btn-admin-danger d-inline-flex align-items-center gap-1"
+                          style={{ padding: '6px 12px', fontSize: 'var(--text-sm)' }}
+                          disabled={isProcessing}
+                          onClick={() => {
+                            setDeleteModalItem({ id: ngo.id, name: ngoName, phone: contactNum });
+                            setBlockPhoneChecked(true);
+                          }}
+                          title="Case A: Confirmed fraud or fake. Permanently delete and optionally block phone"
+                        >
+                          <Trash2 size={15} />
+                          <span>Delete</span>
+                        </button>
                       </div>
                     </div>
 
-                    <div className="row g-3 pt-2 border-top" style={{ borderColor: 'var(--color-border)' }}>
+                    {/* NGO Details Grid */}
+                    <div className="row g-3 pt-2 border-top" style={{ borderColor: 'var(--color-border-subtle)', fontSize: 'var(--text-sm)' }}>
                       <div className="col-md-3">
                         <div className="text-muted small d-flex align-items-center gap-1">
                           <MapPin size={13} /> City
@@ -309,6 +624,53 @@ export default function NgoVerification() {
                         <div className="fw-semibold mt-1">{coordinatorName}</div>
                       </div>
                     </div>
+
+                    {/* Admin-only Notes Section on the card (Case B: Couldn't reach) */}
+                    {adminNotes.length > 0 && (
+                      <div
+                        className="mt-3 p-3 rounded"
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          fontSize: 'var(--text-sm)',
+                        }}
+                      >
+                        <div className="d-flex align-items-center justify-content-between mb-2">
+                          <div className="d-flex align-items-center gap-1 fw-semibold text-primary">
+                            <StickyNote size={14} />
+                            <span>Admin Call Log / Notes (Hidden from NGO)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNoteModalItem({ id: ngo.id, name: ngoName, notes: adminNotes });
+                              setNoteText('');
+                            }}
+                            className="btn btn-sm p-0 text-primary"
+                            style={{ fontSize: '11px', textDecoration: 'underline' }}
+                          >
+                            + Add another note
+                          </button>
+                        </div>
+
+                        <div className="d-flex flex-column gap-2">
+                          {adminNotes.map((nt, idx) => (
+                            <div
+                              key={idx}
+                              className="d-flex justify-content-between align-items-start gap-2 py-1 px-2 rounded"
+                              style={{ background: '#ffffff', border: '1px solid #f1f5f9' }}
+                            >
+                              <span style={{ color: '#334155' }}>
+                                📌 <strong>{nt.note}</strong>
+                              </span>
+                              <span className="text-muted" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                {formatDate(nt.createdAt)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -316,57 +678,253 @@ export default function NgoVerification() {
           )}
         </section>
 
-        {/* Confirmation Modal for Rejecting NGO */}
-        {confirmReject && (
+        {/* Modal 1: Decline Confirmation Modal (Reversible) */}
+        {declineModalItem && (
           <div
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.45)',
+              background: 'rgba(0, 0, 0, 0.5)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 1050,
               padding: '16px',
             }}
-            onClick={() => setConfirmReject(null)}
+            onClick={() => setDeclineModalItem(null)}
           >
             <div
               style={{
-                maxWidth: '440px',
+                maxWidth: '460px',
                 width: '100%',
                 background: 'var(--color-surface)',
-                boxShadow: 'var(--shadow-lg)',
+                boxShadow: 'var(--shadow-xl)',
                 borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-6)',
+                padding: '28px',
                 border: '1px solid var(--color-border)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="d-flex align-items-center gap-2 mb-2" style={{ color: 'var(--color-danger)' }}>
-                <AlertTriangle size={20} />
+              <div className="d-flex align-items-center gap-2 mb-2" style={{ color: '#b45309' }}>
+                <AlertTriangle size={22} />
                 <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
                   Decline NGO Application
                 </h3>
               </div>
-              <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
-                Are you sure you want to decline the verification application for <strong>"{confirmReject.name}"</strong>? This will update the status of this NGO.
+              <p className="text-muted mb-3" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to decline <strong>"{declineModalItem.name}"</strong>?
               </p>
+              <div
+                className="p-3 mb-4 rounded"
+                style={{ background: '#fef3c7', border: '1px solid #fde68a', fontSize: '13px', color: '#92400e' }}
+              >
+                <strong>Note:</strong> This action is <strong>reversible</strong>. NGO pickup features will stay locked, but the applicant can still log in as a normal community donor. If you wish to permanently delete fraud accounts, use <em>Delete</em> instead.
+              </div>
 
               <div className="d-flex justify-content-end gap-2">
                 <button
                   type="button"
                   className="btn-admin-outline"
-                  onClick={() => setConfirmReject(null)}
+                  onClick={() => setDeclineModalItem(null)}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   className="btn-admin-danger"
-                  onClick={confirmRejectAction}
+                  style={{ backgroundColor: '#b45309', borderColor: '#b45309' }}
+                  onClick={confirmDeclineAction}
                 >
-                  Yes, Decline
+                  Confirm Decline
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal 2: Admin Call Note Modal (Case B: Couldn't reach) */}
+        {noteModalItem && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1050,
+              padding: '16px',
+            }}
+            onClick={() => setNoteModalItem(null)}
+          >
+            <div
+              style={{
+                maxWidth: '480px',
+                width: '100%',
+                background: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-xl)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '28px',
+                border: '1px solid var(--color-border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div className="d-flex align-items-center gap-2 text-primary">
+                  <StickyNote size={20} />
+                  <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                    Log Call Attempt Note
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNoteModalItem(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <p className="text-muted mb-2" style={{ fontSize: '13px' }}>
+                Keep <strong>{noteModalItem.name}</strong> Pending and add an admin-only note. The NGO will never see this note.
+              </p>
+
+              {/* Quick Preset Buttons */}
+              <div className="d-flex flex-wrap gap-1 mb-3">
+                {[
+                  `Called ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, no answer`,
+                  'Phone switched off / unreachable',
+                  'Number busy, will retry tomorrow',
+                  'Coordinator requested callback later',
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="btn btn-sm btn-light border"
+                    style={{ fontSize: '11px', padding: '3px 8px' }}
+                    onClick={() => setNoteText(preset)}
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleSaveNote}>
+                <div className="mb-3">
+                  <label className="form-label fw-semibold" style={{ fontSize: '13px' }}>
+                    Note Content
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="admin-form-input w-100"
+                    placeholder="e.g. Called 29 Sep 6 PM, no answer..."
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div className="d-flex justify-content-end gap-2">
+                  <button
+                    type="button"
+                    className="btn-admin-outline"
+                    onClick={() => setNoteModalItem(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-admin-primary"
+                    disabled={isSavingNote || !noteText.trim()}
+                  >
+                    {isSavingNote ? 'Saving...' : 'Save Note'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal 3: Case A Confirmed Fraud Delete & Block Phone Modal */}
+        {deleteModalItem && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1050,
+              padding: '16px',
+            }}
+            onClick={() => setDeleteModalItem(null)}
+          >
+            <div
+              style={{
+                maxWidth: '480px',
+                width: '100%',
+                background: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-xl)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '28px',
+                border: '1px solid var(--color-border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center gap-2 mb-2" style={{ color: 'var(--color-danger)' }}>
+                <ShieldAlert size={24} />
+                <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                  Delete NGO Application (Fraud / Fake)
+                </h3>
+              </div>
+              <p className="text-muted mb-3" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to permanently delete <strong>"{deleteModalItem.name}"</strong>? This will remove all their data from the database.
+              </p>
+
+              {/* Case A Checkbox: Also block this phone number */}
+              <div
+                className="p-3 mb-4 rounded"
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                }}
+              >
+                <label className="d-flex align-items-start gap-2 cursor-pointer m-0" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={blockPhoneChecked}
+                    onChange={(e) => setBlockPhoneChecked(e.target.checked)}
+                    style={{ marginTop: '3px', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <div>
+                    <strong style={{ color: '#991b1b', fontSize: '14px' }}>
+                      Also block this phone number ({deleteModalItem.phone})
+                    </strong>
+                    <div className="text-muted" style={{ fontSize: '12px', marginTop: '2px' }}>
+                      Stops future account and NGO registrations with this mobile number to prevent re-registration by fraud accounts.
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div className="d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  className="btn-admin-outline"
+                  onClick={() => setDeleteModalItem(null)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-admin-danger"
+                  onClick={handleDeleteConfirm}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : blockPhoneChecked ? 'Delete & Block Number' : 'Delete NGO'}
                 </button>
               </div>
             </div>

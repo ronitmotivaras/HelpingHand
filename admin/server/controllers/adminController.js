@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const User = require('../models/User');
 const FoodDonation = require('../models/FoodDonation');
+const BlockedPhone = require('../models/BlockedPhone');
 
 function sanitizeUser(user) {
   const rawNgo = user.ngoDetails ? (user.ngoDetails.toObject ? user.ngoDetails.toObject() : { ...user.ngoDetails }) : {};
@@ -22,6 +23,7 @@ function sanitizeUser(user) {
       coordinatorPhone: rawNgo.coordinatorPhone || '',
       coordinatorName: rawNgo.coordinatorName || '',
     },
+    adminNotes: Array.isArray(user.adminNotes) ? user.adminNotes : [],
     createdAt: user.createdAt,
   };
 }
@@ -66,10 +68,13 @@ async function adminLogin(req, res) {
 
 async function listNgoRequests(req, res) {
   try {
-    const { status } = req.query;
+    const { status, hasNotes } = req.query;
     let query = { ngoStatus: { $ne: 'none' } };
     if (status && status !== 'all') {
       query.ngoStatus = status;
+    }
+    if (hasNotes === 'true') {
+      query['adminNotes.0'] = { $exists: true };
     }
     const users = await User.find(query).sort({ createdAt: -1 });
     return res.json(users.map(sanitizeUser));
@@ -78,14 +83,12 @@ async function listNgoRequests(req, res) {
   }
 }
 
+// Case: Called and confirmed real -> Verify
 async function approveNgo(req, res) {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
-    }
-    if (user.ngoStatus !== 'pending') {
-      return res.status(400).json({ message: 'This user does not have a pending NGO request' });
     }
     user.ngoStatus = 'approved';
     await user.save();
@@ -95,20 +98,59 @@ async function approveNgo(req, res) {
   }
 }
 
+// Case: Doubtful, but not proven fake -> Decline (reversible, NGO features stay locked)
 async function rejectNgo(req, res) {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    if (user.ngoStatus !== 'pending') {
-      return res.status(400).json({ message: 'This user does not have a pending NGO request' });
-    }
     user.ngoStatus = 'rejected';
     await user.save();
     return res.json(sanitizeUser(user));
   } catch (err) {
-    return res.status(500).json({ message: 'Failed to reject NGO request' });
+    return res.status(500).json({ message: 'Failed to decline NGO request' });
+  }
+}
+
+// Revert to pending
+async function setNgoPending(req, res) {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    user.ngoStatus = 'pending';
+    await user.save();
+    return res.json(sanitizeUser(user));
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to update NGO status' });
+  }
+}
+
+// Case B: Couldn't reach -> Keep Pending and add an admin-only note on the card
+async function addAdminNote(req, res) {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { note } = req.body;
+    if (!note || !String(note).trim()) {
+      return res.status(400).json({ message: 'Note content is required' });
+    }
+
+    user.adminNotes = user.adminNotes || [];
+    user.adminNotes.unshift({
+      note: String(note).trim(),
+      createdAt: new Date(),
+    });
+
+    await user.save();
+    return res.json(sanitizeUser(user));
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to add admin note' });
   }
 }
 
@@ -121,7 +163,6 @@ async function listUsers(req, res) {
     } else if (type === 'ngo') {
       query = { ngoStatus: { $ne: 'none' } };
     } else {
-      // Default to donators to keep donators separate from NGOs
       query = { ngoStatus: 'none' };
     }
     const users = await User.find(query).sort({ createdAt: -1 });
@@ -153,6 +194,10 @@ async function updateUser(req, res) {
       if (!/^\d{10}$/.test(cleanMobile)) {
         return res.status(400).json({ message: 'Mobile number must be exactly 10 digits (0-9 only)' });
       }
+      const isBlocked = await BlockedPhone.findOne({ phone: cleanMobile });
+      if (isBlocked) {
+        return res.status(403).json({ message: 'This phone number is blocked from use.' });
+      }
       const taken = await User.findOne({ mobile: cleanMobile, _id: { $ne: user._id } });
       if (taken) {
         return res.status(409).json({ message: 'Mobile number is already in use' });
@@ -183,6 +228,7 @@ async function updateUser(req, res) {
   }
 }
 
+// Case A: Confirmed fraud -> Delete (all data removed, optionally block the number)
 async function deleteUser(req, res) {
   try {
     const user = await User.findById(req.params.id);
@@ -190,9 +236,48 @@ async function deleteUser(req, res) {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const shouldBlock = req.body?.blockPhone === true || req.query?.blockPhone === 'true';
+    if (shouldBlock) {
+      const phonesToBlock = new Set();
+      if (user.mobile && /^\d{10}$/.test(user.mobile)) {
+        phonesToBlock.add(user.mobile);
+      }
+      if (user.ngoDetails?.contactNum && /^\d{10}$/.test(user.ngoDetails.contactNum)) {
+        phonesToBlock.add(user.ngoDetails.contactNum);
+      }
+      if (user.ngoDetails?.coordinatorPhone && /^\d{10}$/.test(user.ngoDetails.coordinatorPhone)) {
+        phonesToBlock.add(user.ngoDetails.coordinatorPhone);
+      }
+
+      for (const phone of phonesToBlock) {
+        await BlockedPhone.findOneAndUpdate(
+          { phone },
+          {
+            phone,
+            reason: req.body?.reason || 'Confirmed fraud / fake NGO registration',
+            blockedBy: 'admin',
+            blockedAt: new Date(),
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+
+    // Delete donations by this user
     await FoodDonation.deleteMany({ donorId: user._id });
+
+    // Clean up any requests made by this NGO
+    await FoodDonation.updateMany(
+      { 'requests.ngoId': user._id },
+      { $pull: { requests: { ngoId: user._id } } }
+    );
+
     await user.deleteOne();
-    return res.json({ message: 'User deleted' });
+    return res.json({
+      message: shouldBlock
+        ? 'User deleted and phone number successfully blocked from future registration'
+        : 'User deleted',
+    });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to delete user' });
   }
@@ -241,8 +326,9 @@ module.exports = {
   listNgoRequests,
   approveNgo,
   rejectNgo,
+  setNgoPending,
+  addAdminNote,
   listUsers,
   updateUser,
   deleteUser,
 };
-

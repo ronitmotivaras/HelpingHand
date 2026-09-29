@@ -376,6 +376,65 @@ a:hover { color: var(--color-primary-hover); }
   border: 1px solid rgba(26,122,46,0.15);
 }
 
+.badge-verified-ngo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-full);
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.ngo-requests-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.donor-request-item {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  transition: all var(--transition);
+}
+.donor-request-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.phone-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: none;
+  padding: 3px 9px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  transition: all var(--transition);
+}
+.phone-link-btn:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
 /* ─── Buttons ───────────────────────────────────────────── */
 .btn-hh,
 .btn-primary,

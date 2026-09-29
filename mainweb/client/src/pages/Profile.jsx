@@ -142,7 +142,15 @@ export default function Profile() {
                   />
                 </div>
               ) : (
-                <h1 className="section-title mb-0" style={{ fontSize: 'var(--text-2xl)' }}>{user?.name}</h1>
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  <h1 className="section-title mb-0" style={{ fontSize: 'var(--text-2xl)' }}>{user?.name}</h1>
+                  {user?.ngoStatus === 'approved' && (
+                    <span className="badge-verified-ngo">
+                      <BadgeCheck size={14} />
+                      <span>Verified NGO</span>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
@@ -254,22 +262,21 @@ export default function Profile() {
             <div className="detail-row">
               <span className="d-flex align-items-center gap-2">
                 <Shield size={15} color="var(--color-text-muted)" />
-                <span>NGO Status</span>
+                <span>NGO Verification</span>
               </span>
               <span>
                 {user?.ngoStatus === 'approved' ? (
-                  <span className="badge-status approved d-inline-flex align-items-center gap-1">
-                    <BadgeCheck size={13} />
-                    <span>NGO</span>
+                  <span className="badge-verified-ngo">
+                    <BadgeCheck size={14} />
+                    <span>Verified NGO</span>
                   </span>
                 ) : user?.ngoStatus === 'pending' ? (
-                  <span className="badge-status pending d-inline-flex align-items-center gap-1">
-                    <Clock size={13} />
-                    <span>Pending</span>
+                  <span className="text-muted small">
+                    Waiting for verification
                   </span>
                 ) : (
-                  <span className="badge-status rejected d-inline-flex align-items-center gap-1">
-                    <span>Declined</span>
+                  <span className="text-muted small">
+                    Application Declined
                   </span>
                 )}
               </span>

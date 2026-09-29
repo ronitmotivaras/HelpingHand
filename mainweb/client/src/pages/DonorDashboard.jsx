@@ -7,21 +7,29 @@ import {
   Clock,
   MapPin,
   CheckCircle2,
+  XCircle,
   RotateCcw,
   Inbox,
   Flame,
-  UserCheck,
   Calendar,
+  Phone,
+  BadgeCheck,
+  Users,
   AlertCircle,
-  X,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import api from '../api/axiosInstance';
 
 function getStatusBadge(status) {
-  if (status === 'booked') return <span className="badge-status booked">Booked</span>;
-  if (status === 'pickedUp') return <span className="badge-status pickedUp">Picked Up</span>;
-  if (status === 'expired') return <span className="badge-status expired">Expired</span>;
+  if (status === 'accepted' || status === 'booked') {
+    return <span className="badge-status accepted">Accepted</span>;
+  }
+  if (status === 'pickedUp') {
+    return <span className="badge-status pickedUp">Picked Up</span>;
+  }
+  if (status === 'expired') {
+    return <span className="badge-status expired">Expired</span>;
+  }
   return <span className="badge-status available">Available</span>;
 }
 
@@ -50,10 +58,6 @@ export default function DonorDashboard() {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed' | 'all'
   const [processingId, setProcessingId] = useState(null);
 
-  // Modal for booking with NGO name note
-  const [bookingModalItem, setBookingModalItem] = useState(null);
-  const [ngoNote, setNgoNote] = useState('');
-
   async function loadListings() {
     setLoading(true);
     try {
@@ -72,45 +76,54 @@ export default function DonorDashboard() {
 
   // Stats calculation
   const totalCount = listings.length;
-  const activeCount = listings.filter((l) => l.status === 'available' || l.status === 'booked').length;
+  const activeCount = listings.filter((l) => l.status === 'available' || l.status === 'accepted' || l.status === 'booked').length;
   const pickedUpCount = listings.filter((l) => l.status === 'pickedUp').length;
 
   // Filter listings by tab
   const filteredListings = listings.filter((l) => {
-    if (activeTab === 'active') return l.status === 'available' || l.status === 'booked';
-    if (activeTab === 'completed') return l.status === 'pickedUp';
-    return true; // 'all'
+    if (activeTab === 'active') {
+      return l.status === 'available' || l.status === 'accepted' || l.status === 'booked';
+    }
+    if (activeTab === 'completed') {
+      return l.status === 'pickedUp';
+    }
+    return true;
   });
 
-  // Action: Open book modal
-  function openBookModal(listing) {
-    setBookingModalItem(listing);
-    setNgoNote('');
-  }
-
-  // Action: Confirm Book
-  async function handleConfirmBook(e) {
-    e.preventDefault();
-    if (!bookingModalItem) return;
-    setProcessingId(bookingModalItem.id);
+  // Action: Accept an NGO request
+  async function handleAcceptRequest(listingId, requestId, ngoName) {
+    setProcessingId(requestId || listingId);
     try {
-      await api.post(`/food/${bookingModalItem.id}/book`, { ngoName: ngoNote });
-      toast.success('Listing marked as booked by NGO');
-      setBookingModalItem(null);
+      await api.post(`/food/${listingId}/requests/${requestId}/accept`);
+      toast.success(`Request accepted! Food is now reserved for ${ngoName || 'the NGO'}. Other requests have been closed.`);
       await loadListings();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to book listing');
+      toast.error(err.response?.data?.message || 'Failed to accept request');
     } finally {
       setProcessingId(null);
     }
   }
 
-  // Action: Release booked listing
+  // Action: Decline an NGO request
+  async function handleDeclineRequest(listingId, requestId, ngoName) {
+    setProcessingId(requestId || listingId);
+    try {
+      await api.post(`/food/${listingId}/requests/${requestId}/decline`);
+      toast.success(`Declined request from ${ngoName || 'NGO'}. Other requests remain active.`);
+      await loadListings();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to decline request');
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  // Action: Release accepted listing back to available
   async function handleRelease(id) {
     setProcessingId(id);
     try {
       await api.post(`/food/${id}/release`);
-      toast.success('Listing released back to available');
+      toast.success('Listing released back to available and visible in NGO feed again');
       await loadListings();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to release listing');
@@ -124,7 +137,7 @@ export default function DonorDashboard() {
     setProcessingId(id);
     try {
       await api.post(`/food/${id}/picked-up`);
-      toast.success('Listing marked as Picked Up!');
+      toast.success('Listing marked as Picked Up! Thank you for donating.');
       await loadListings();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update status');
@@ -142,7 +155,7 @@ export default function DonorDashboard() {
           <div>
             <h1 className="display-title mb-1">Donor Dashboard</h1>
             <p className="food-card-meta mb-0" style={{ fontSize: 'var(--text-base)' }}>
-              Manage your food donations, track pickups, and mark statuses.
+              Manage your food donations, coordinate with verified NGOs, and track pickups.
             </p>
           </div>
           <Link to="/donate" className="btn-hh-primary d-inline-flex align-items-center gap-2">
@@ -243,7 +256,7 @@ export default function DonorDashboard() {
             </h3>
             <p className="empty-state-text mb-4">
               {activeTab === 'active'
-                ? 'Have extra food to share? Create a new listing and connect with local NGOs.'
+                ? 'Have surplus food to share? Create a new listing and connect with local NGOs.'
                 : 'When NGOs pick up your food, they will appear in your Completed history.'}
             </p>
             <Link to="/donate" className="btn-hh-secondary d-inline-flex align-items-center gap-2">
@@ -255,15 +268,24 @@ export default function DonorDashboard() {
 
         {/* Listings Cards */}
         {!loading && filteredListings.length > 0 && (
-          <div className="d-flex flex-column gap-3">
+          <div className="d-flex flex-column gap-4">
             {filteredListings.map((listing) => {
               const isNonVeg = listing.foodType === 'nonveg';
               const isBusy = processingId === listing.id;
               const urgent = isExpiringSoon(listing.expiryAt);
 
+              const isAccepted = listing.status === 'accepted' || listing.status === 'booked';
+              const isAvailable = listing.status === 'available';
+              const isPickedUp = listing.status === 'pickedUp';
+
+              const pendingRequests = (listing.requests || []).filter((r) => r.status === 'pending');
+              const requestCount = listing.requestCount ?? pendingRequests.length;
+
+              const acceptedNgo = listing.acceptedNgo || (listing.bookedByNgoName ? { ngoName: listing.bookedByNgoName } : null);
+
               return (
-                <div className="hh-card mb-0" key={listing.id}>
-                  {/* Card top */}
+                <div className="hh-card mb-0" key={listing.id} style={{ border: isAccepted ? '1px solid #fde68a' : undefined }}>
+                  {/* Card top row */}
                   <div className="d-flex justify-content-between align-items-start gap-2 mb-3 flex-wrap">
                     <div>
                       <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
@@ -274,10 +296,20 @@ export default function DonorDashboard() {
                           <span className="diet-dot" />
                         </span>
                         <h3 className="card-title m-0">{listing.foodName}</h3>
-                        {urgent && listing.status !== 'pickedUp' && listing.status !== 'expired' && (
+                        {urgent && !isPickedUp && listing.status !== 'expired' && (
                           <span className="badge-use-quickly">
                             <Flame size={12} />
                             <span>Use quickly</span>
+                          </span>
+                        )}
+                        {isAvailable && (
+                          <span className="ngo-requests-badge">
+                            <Users size={12} />
+                            <span>
+                              {requestCount > 0
+                                ? `${requestCount} request${requestCount > 1 ? 's' : ''}`
+                                : 'No requests yet'}
+                            </span>
                           </span>
                         )}
                       </div>
@@ -329,144 +361,191 @@ export default function DonorDashboard() {
                     </div>
                   </div>
 
-                  {/* Booked by NGO info banner */}
-                  {listing.status === 'booked' && (
-                    <div className="pickup-prompt-box mb-3">
-                      <div>
-                        <div className="d-flex align-items-center gap-1 fw-semibold" style={{ color: '#b45309' }}>
-                          <UserCheck size={16} />
-                          <span>Booked by NGO {listing.bookedByNgoName ? `(${listing.bookedByNgoName})` : ''}</span>
+                  {/* CASE 1: AVAILABLE - Show incoming NGO requests */}
+                  {isAvailable && (
+                    <div
+                      className="p-3 rounded mt-2"
+                      style={{
+                        background: pendingRequests.length > 0 ? '#f8fafc' : 'var(--color-surface-2)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    >
+                      <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                        <div className="d-flex align-items-center gap-2">
+                          <Users size={16} color="var(--color-primary)" />
+                          <strong style={{ fontSize: 'var(--text-sm)' }}>
+                            NGO Pickup Requests ({pendingRequests.length})
+                          </strong>
                         </div>
-                        <div className="small text-muted mt-1">
-                          Was this donation picked up by the NGO?
-                        </div>
+                        {pendingRequests.length > 0 && (
+                          <span className="text-muted" style={{ fontSize: '11px' }}>
+                            Talk by phone. If you agree, click Accept.
+                          </span>
+                        )}
                       </div>
-                      <div className="d-flex gap-2">
-                        <button
-                          type="button"
-                          className="btn-hh-primary d-inline-flex align-items-center gap-1"
-                          style={{ padding: '6px 14px', fontSize: 'var(--text-sm)' }}
-                          disabled={isBusy}
-                          onClick={() => handlePickedUp(listing.id)}
-                        >
-                          <CheckCircle2 size={15} />
-                          <span>Picked Up</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-hh-secondary d-inline-flex align-items-center gap-1"
-                          style={{ padding: '6px 14px', fontSize: 'var(--text-sm)' }}
-                          disabled={isBusy}
-                          onClick={() => handleRelease(listing.id)}
-                          title="Release back to available so another NGO can take it"
-                        >
-                          <RotateCcw size={14} />
-                          <span>Release</span>
-                        </button>
+
+                      {pendingRequests.length === 0 ? (
+                        <div className="py-2 text-muted" style={{ fontSize: 'var(--text-sm)' }}>
+                          Listing is available in the NGO feed. When NGOs click <em>Request Pickup</em>, their details will appear here.
+                        </div>
+                      ) : (
+                        <div className="d-flex flex-column gap-2 mt-2">
+                          {pendingRequests.map((req) => {
+                            const isReqBusy = processingId === req.id;
+                            return (
+                              <div
+                                key={req.id}
+                                className="donor-request-item d-flex justify-content-between align-items-center flex-wrap gap-3"
+                              >
+                                <div>
+                                  <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                    <strong style={{ fontSize: 'var(--text-base)', color: 'var(--color-text)' }}>
+                                      {req.ngoName}
+                                    </strong>
+                                    <span className="badge-verified-ngo">
+                                      <BadgeCheck size={13} />
+                                      <span>Verified NGO</span>
+                                    </span>
+                                  </div>
+                                  <div className="d-flex align-items-center gap-3 text-muted flex-wrap" style={{ fontSize: 'var(--text-sm)' }}>
+                                    <span>
+                                      Contact: <strong>{req.coordinatorName || 'Coordinator'}</strong>
+                                    </span>
+                                    <a
+                                      href={`tel:${req.phone}`}
+                                      className="phone-link-btn"
+                                      title="Call NGO coordinator"
+                                    >
+                                      <Phone size={13} />
+                                      <span>{req.phone}</span>
+                                    </a>
+                                    <span style={{ fontSize: '11px' }}>
+                                      Requested {formatDate(req.createdAt)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="d-flex gap-2">
+                                  <button
+                                    type="button"
+                                    className="btn-hh-primary d-inline-flex align-items-center gap-1"
+                                    style={{ padding: '6px 14px', fontSize: 'var(--text-sm)' }}
+                                    disabled={isReqBusy}
+                                    onClick={() => handleAcceptRequest(listing.id, req.id, req.ngoName)}
+                                  >
+                                    <CheckCircle2 size={15} />
+                                    <span>{isReqBusy ? 'Accepting...' : 'Accept'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-hh-secondary d-inline-flex align-items-center gap-1"
+                                    style={{ padding: '6px 14px', fontSize: 'var(--text-sm)' }}
+                                    disabled={isReqBusy}
+                                    onClick={() => handleDeclineRequest(listing.id, req.id, req.ngoName)}
+                                    title="Decline this request without affecting other NGOs"
+                                  >
+                                    <XCircle size={15} />
+                                    <span>Decline</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* CASE 2: ACCEPTED - Show accepted NGO, Picked Up, and Release */}
+                  {isAccepted && (
+                    <div
+                      className="p-3 rounded mt-2"
+                      style={{
+                        background: '#fffbeb',
+                        border: '1px solid #fde68a',
+                      }}
+                    >
+                      <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div>
+                          <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                            <span className="badge-status accepted" style={{ padding: '2px 8px', fontSize: '11px' }}>
+                              Accepted
+                            </span>
+                            <strong style={{ fontSize: 'var(--text-base)', color: '#92400e' }}>
+                              {acceptedNgo?.ngoName || 'NGO'}
+                            </strong>
+                            <span className="badge-verified-ngo">
+                              <BadgeCheck size={13} />
+                              <span>Verified NGO</span>
+                            </span>
+                          </div>
+
+                          <div className="d-flex align-items-center gap-3 text-muted flex-wrap" style={{ fontSize: 'var(--text-sm)' }}>
+                            {acceptedNgo?.coordinatorName && (
+                              <span>
+                                Coordinator: <strong>{acceptedNgo.coordinatorName}</strong>
+                              </span>
+                            )}
+                            {acceptedNgo?.phone && (
+                              <a
+                                href={`tel:${acceptedNgo.phone}`}
+                                className="phone-link-btn"
+                                title="Call NGO"
+                              >
+                                <Phone size={13} />
+                                <span>{acceptedNgo.phone}</span>
+                              </a>
+                            )}
+                            {acceptedNgo?.acceptedAt && (
+                              <span style={{ fontSize: '11px' }}>
+                                Accepted {formatDate(acceptedNgo.acceptedAt)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="small text-muted mt-1">
+                            Once collected, click Picked Up. If the NGO cannot come, click Release to make food available in the feed again.
+                          </div>
+                        </div>
+
+                        <div className="d-flex gap-2">
+                          <button
+                            type="button"
+                            className="btn-hh-primary d-inline-flex align-items-center gap-1"
+                            style={{ padding: '7px 16px', fontSize: 'var(--text-sm)' }}
+                            disabled={isBusy}
+                            onClick={() => handlePickedUp(listing.id)}
+                          >
+                            <CheckCircle2 size={16} />
+                            <span>{isBusy ? 'Saving...' : 'Picked Up'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-hh-secondary d-inline-flex align-items-center gap-1"
+                            style={{ padding: '7px 14px', fontSize: 'var(--text-sm)' }}
+                            disabled={isBusy}
+                            onClick={() => handleRelease(listing.id)}
+                            title="If the NGO cannot come, return listing to Available"
+                          >
+                            <RotateCcw size={15} />
+                            <span>Release</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Actions for Available status */}
-                  {listing.status === 'available' && (
-                    <div className="d-flex justify-content-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        className="btn-hh-secondary d-inline-flex align-items-center gap-1"
-                        style={{ padding: '6px 14px', fontSize: 'var(--text-sm)' }}
-                        disabled={isBusy}
-                        onClick={() => openBookModal(listing)}
-                      >
-                        <UserCheck size={15} />
-                        <span>Mark as Booked</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-hh-primary d-inline-flex align-items-center gap-1"
-                        style={{ padding: '6px 14px', fontSize: 'var(--text-sm)' }}
-                        disabled={isBusy}
-                        onClick={() => handlePickedUp(listing.id)}
-                      >
-                        <CheckCircle2 size={15} />
-                        <span>Mark as Picked Up</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Picked up note */}
-                  {listing.status === 'pickedUp' && (
-                    <div className="text-muted small d-flex align-items-center gap-1 pt-1">
-                      <CheckCircle2 size={14} color="var(--color-success)" />
-                      <span>Successfully picked up {listing.pickedUpAt ? `on ${formatDate(listing.pickedUpAt)}` : ''}</span>
+                  {/* CASE 3: PICKED UP - Finished state */}
+                  {isPickedUp && (
+                    <div className="text-muted small d-flex align-items-center gap-1 pt-2">
+                      <CheckCircle2 size={15} color="var(--color-success)" />
+                      <span>
+                        Donation completed! Picked up by {acceptedNgo?.ngoName ? <strong>{acceptedNgo.ngoName}</strong> : 'NGO'} {listing.pickedUpAt ? `on ${formatDate(listing.pickedUpAt)}` : ''}.
+                      </span>
                     </div>
                   )}
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {/* Modal: Mark as Booked by NGO */}
-        {bookingModalItem && (
-          <div
-            className="modal-backdrop"
-            style={{
-              position: 'fixed',
-              inset: 0,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1050,
-              padding: '16px',
-            }}
-          >
-            <div className="hh-card" style={{ maxWidth: '440px', width: '100%', margin: 0 }}>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h4 className="card-title m-0">Mark as Booked</h4>
-                <button
-                  type="button"
-                  onClick={() => setBookingModalItem(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <p className="food-card-meta mb-3">
-                Record which NGO is coming to collect <strong>{bookingModalItem.foodName}</strong>.
-              </p>
-              <form onSubmit={handleConfirmBook}>
-                <div className="form-group mb-3">
-                  <label className="form-label" htmlFor="ngo-note">
-                    NGO Name / Note (Optional)
-                  </label>
-                  <input
-                    id="ngo-note"
-                    className="form-control"
-                    placeholder="e.g. Robin Hood Army, Local Relief NGO"
-                    value={ngoNote}
-                    onChange={(e) => setNgoNote(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-                <div className="d-flex justify-content-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    className="btn-hh-secondary"
-                    onClick={() => setBookingModalItem(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-hh-primary"
-                    disabled={processingId === bookingModalItem.id}
-                  >
-                    {processingId === bookingModalItem.id ? 'Saving...' : 'Confirm Booked'}
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         )}
       </main>
