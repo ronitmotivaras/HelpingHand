@@ -33,27 +33,13 @@ export default function AdminLogin() {
     <div className="admin-login-wrapper">
       <div className="admin-login-card">
 
-        {/* Brand icon */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-          <div
-            style={{
-              width: '60px',
-              height: '60px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, var(--color-primary), #1d9e3b)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 6px 20px rgba(26,122,46,0.35)',
-            }}
-          >
-            <Leaf size={28} color="#fff" strokeWidth={2.5} />
-          </div>
+        {/* Brand */}
+        <div className="d-flex align-items-center justify-content-center gap-2 mb-2">
+          <Leaf size={30} color="var(--color-primary)" strokeWidth={2.5} />
+          <h1 className="login-title mb-0" style={{ color: 'var(--color-primary)', display: 'inline' }}>HelpingHand</h1>
+          <span className="brand-tag">Admin</span>
         </div>
-
-        {/* Title */}
-        <h1 className="login-title">Admin Console</h1>
-        <p className="login-subtitle">HelpingHand Platform Administration</p>
+        <p className="login-subtitle mb-4">Platform Administration Console</p>
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
@@ -141,23 +127,6 @@ export default function AdminLogin() {
           </button>
         </form>
 
-        {/* Footer note */}
-        <div
-          style={{
-            marginTop: '24px',
-            paddingTop: '20px',
-            borderTop: '1px solid var(--color-border-subtle)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-          }}
-        >
-          <ShieldCheck size={13} color="var(--color-text-muted)" />
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-            Restricted access — authorized personnel only
-          </span>
-        </div>
       </div>
 
       <style>{`

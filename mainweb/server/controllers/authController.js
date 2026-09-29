@@ -25,24 +25,31 @@ async function register(req, res) {
       accountType,
       ngoName,
       ngoAddress,
+      address,
       ngoContactNum,
+      contactNum,
+      coordinatorName,
       coordinatorPhone,
     } = req.body;
 
     const isNgo = accountType === 'ngo';
 
     if (isNgo) {
-      const finalNgoName = String(ngoName || '').trim();
+      const finalNgoName = String(ngoName || name || '').trim();
       const finalAddress = String(address || ngoAddress || '').trim();
       const finalCity = String(city || '').trim();
-      const finalContactNum = String(contactNum || ngoContactNum || mobile || '').trim();
+      const finalContactNum = String(contactNum || mobile || ngoContactNum || coordinatorPhone || '').trim();
       const finalCoordinatorName = String(coordinatorName || '').trim();
 
       if (!finalNgoName || !finalAddress || !finalCity || !finalCoordinatorName || !password || !confirmPassword) {
         return res.status(400).json({ message: 'All NGO fields are required' });
       }
 
-      if (finalContactNum && !/^\d{10}$/.test(finalContactNum)) {
+      if (!finalContactNum) {
+        return res.status(400).json({ message: 'Contact mobile number is required' });
+      }
+
+      if (!/^\d{10}$/.test(finalContactNum)) {
         return res.status(400).json({ message: 'Contact number must be exactly 10 digits (0-9 only)' });
       }
 
@@ -60,17 +67,15 @@ async function register(req, res) {
         return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
       }
 
-      if (finalContactNum) {
-        const existing = await User.findOne({ mobile: finalContactNum });
-        if (existing) {
-          return res.status(409).json({ message: 'Contact number is already registered' });
-        }
+      const existing = await User.findOne({ mobile: finalContactNum });
+      if (existing) {
+        return res.status(409).json({ message: 'Contact mobile number is already registered' });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
       const user = await User.create({
         name: finalNgoName,
-        mobile: finalContactNum || ('ngo_' + Date.now()),
+        mobile: finalContactNum,
         passwordHash,
         city: finalCity,
         ngoStatus: 'pending',
@@ -145,7 +150,7 @@ async function login(req, res) {
   try {
     const { mobile, password } = req.body;
     if (!mobile || !password) {
-      return res.status(400).json({ message: 'Login identifier and password are required' });
+      return res.status(400).json({ message: 'Mobile number and password are required' });
     }
 
     const cleanInput = String(mobile).trim();
@@ -165,12 +170,12 @@ async function login(req, res) {
     }
 
     if (!user) {
-      return res.status(401).json({ message: 'Incorrect mobile/identifier or password' });
+      return res.status(401).json({ message: 'Incorrect mobile number or password' });
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
-      return res.status(401).json({ message: 'Incorrect mobile/identifier or password' });
+      return res.status(401).json({ message: 'Incorrect mobile number or password' });
     }
 
     const token = jwt.sign({ type: 'user', id: user._id }, process.env.USER_JWT_SECRET, {

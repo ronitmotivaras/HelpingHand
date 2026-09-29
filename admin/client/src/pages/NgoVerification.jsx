@@ -118,7 +118,7 @@ export default function NgoVerification() {
 
         <section className="admin-card-panel">
           {/* Header Controls: Search, City Dropdown, Count */}
-          <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-3" style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)' }}>
             <div className="d-flex align-items-center gap-3 flex-wrap">
               <div style={{ position: 'relative', width: '300px', maxWidth: '100%' }}>
                 <Search
@@ -180,7 +180,7 @@ export default function NgoVerification() {
               </span>
             </div>
           ) : (
-            <div className="d-flex flex-column gap-3">
+            <div className="d-flex flex-column gap-3" style={{ padding: 'var(--space-4) var(--space-5)' }}>
               {filteredNgos.map((ngo) => {
                 const isProcessing = processingId === ngo.id;
                 const ngoName = ngo.ngoDetails?.ngoName || ngo.ngoDetails?.name || ngo.name || 'Unnamed NGO';

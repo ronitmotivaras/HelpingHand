@@ -160,7 +160,7 @@ export default function UserAccounts() {
         </div>
 
         <section className="admin-card-panel">
-          <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-3" style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)' }}>
             <div className="d-flex align-items-center gap-3 flex-wrap">
               <div style={{ position: 'relative', width: '300px', maxWidth: '100%' }}>
                 <Search

@@ -42,10 +42,10 @@ export default function Login() {
 
     const errors = {};
     if (!mobile || !mobile.trim()) {
-      errors.mobile = 'Please enter your registered mobile number or NGO name';
+      errors.mobile = 'Please enter your registered mobile number';
     } else {
       const clean = mobile.trim();
-      if (/^\d+$/.test(clean) && clean.length !== 10) {
+      if (!/^\d{10}$/.test(clean)) {
         errors.mobile = 'Mobile number must be exactly 10 digits';
       }
     }
@@ -65,7 +65,7 @@ export default function Login() {
       toast.success('Welcome back to HelpingHand!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Incorrect mobile number/NGO name or password');
+      toast.error(err.response?.data?.message || 'Incorrect mobile number or password');
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group mb-3">
-            <label className="form-label" htmlFor="login-mobile">Registered Mobile Number / NGO Name</label>
+            <label className="form-label" htmlFor="login-mobile">Registered Mobile Number</label>
             <div style={{ position: 'relative' }}>
               <div
                 style={{
@@ -103,7 +103,7 @@ export default function Login() {
                   paddingLeft: '2.4rem',
                   borderColor: fieldErrors.mobile ? 'var(--color-danger)' : undefined,
                 }}
-                placeholder="e.g. 9876543210 or NGO Name"
+                placeholder="e.g. 9876543210"
                 value={mobile}
                 onChange={(e) => handleMobileChange(e.target.value)}
                 autoFocus={!location.state?.mobile}
@@ -187,7 +187,7 @@ export default function Login() {
                 <span>Signing In...</span>
               </>
             ) : (
-              'Sign In to HelpingHand'
+              'Sign In'
             )}
           </button>
         </form>

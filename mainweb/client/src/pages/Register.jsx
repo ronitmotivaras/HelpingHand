@@ -20,9 +20,10 @@ export default function Register() {
     confirmPassword: '',
   });
 
-  // NGO Form State (Strictly 6 fields as requested)
+  // NGO Form State
   const [ngoForm, setNgoForm] = useState({
     ngoName: '',
+    mobile: '',
     city: '',
     address: '',
     coordinatorName: '',
@@ -63,7 +64,15 @@ export default function Register() {
 
   function updateNgo(field, value) {
     setNgoForm((prev) => ({ ...prev, [field]: value }));
-    if (fieldErrors[field]) {
+    if (field === 'mobile') {
+      if (/[^0-9]/.test(value)) {
+        setFieldErrors((prev) => ({ ...prev, mobile: 'Only numbers (0-9) are allowed. No characters, symbols, or spaces.' }));
+      } else if (value.length > 0 && value.length !== 10) {
+        setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number must be exactly 10 digits' }));
+      } else {
+        setFieldErrors((prev) => ({ ...prev, mobile: '' }));
+      }
+    } else if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: '' }));
     }
   }
@@ -121,6 +130,8 @@ export default function Register() {
 
     const errors = {};
     if (!ngoForm.ngoName.trim()) errors.ngoName = 'Please enter NGO name';
+    const mError = validateMobile(ngoForm.mobile);
+    if (mError) errors.mobile = mError;
     if (!ngoForm.city.trim()) errors.city = 'Please select NGO city';
     if (!ngoForm.address.trim()) errors.address = 'Please enter operating address';
     if (!ngoForm.coordinatorName.trim()) errors.coordinatorName = 'Please enter coordinator name';
@@ -138,6 +149,7 @@ export default function Register() {
       await register({
         accountType: 'ngo',
         ngoName: ngoForm.ngoName.trim(),
+        mobile: ngoForm.mobile.trim(),
         city: ngoForm.city.trim(),
         address: ngoForm.address.trim(),
         coordinatorName: ngoForm.coordinatorName.trim(),
@@ -145,7 +157,7 @@ export default function Register() {
         confirmPassword: ngoForm.confirmPassword,
       });
       toast.success('NGO verification application submitted! Please sign in.');
-      navigate('/login', { state: { mobile: ngoForm.ngoName } });
+      navigate('/login', { state: { mobile: ngoForm.mobile.trim() } });
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'NGO Registration failed. Please try again.');
     } finally {
@@ -166,7 +178,7 @@ export default function Register() {
         </Link>
         <div className="d-flex align-items-center gap-2 mb-1">
           <Leaf size={26} color="var(--color-primary)" strokeWidth={2.5} />
-          <h1 className="section-title mb-0" style={{ color: 'var(--color-primary)', fontSize: '22px' }}>Join HelpingHand</h1>
+          <h1 className="section-title mb-0" style={{ color: 'var(--color-primary)', fontSize: '22px' }}>HelpingHand</h1>
         </div>
         <p className="food-card-meta mb-3" style={{ fontSize: '13px' }}>Community surplus food rescue network.</p>
 
@@ -435,7 +447,41 @@ export default function Register() {
               )}
             </div>
 
-            {/* 2) NGO City */}
+            {/* 2) Contact Mobile Number */}
+            <div className="form-group mb-2">
+              <label className="form-label" htmlFor="ngo-mobile" style={{ marginBottom: '3px', fontSize: '13px' }}>Contact Mobile Number</label>
+              <div style={{ position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  <Phone size={16} />
+                </div>
+                <input
+                  id="ngo-mobile"
+                  className="form-control"
+                  style={{ paddingLeft: '2.4rem' }}
+                  placeholder="e.g. 9876543210"
+                  value={ngoForm.mobile}
+                  onChange={(e) => updateNgo('mobile', e.target.value)}
+                  required
+                />
+              </div>
+              {fieldErrors.mobile && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={12} />
+                  <span>{fieldErrors.mobile}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 3) NGO City */}
             <div className="form-group mb-2">
               <label className="form-label" htmlFor="ngo-city" style={{ marginBottom: '3px', fontSize: '13px' }}>NGO City</label>
               <div style={{ position: 'relative' }}>
