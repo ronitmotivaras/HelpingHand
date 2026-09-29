@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Leaf, LayoutDashboard, BadgeCheck, Users, LogOut, KeyRound } from 'lucide-react';
+import { Leaf, LayoutDashboard, BadgeCheck, Users, LogOut, KeyRound, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AdminSidebar({ pendingCount, usersCount }) {
   const { adminLogout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   function handleLogout() {
     adminLogout();
@@ -17,12 +22,59 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
 
   return (
     <>
-      <aside className="admin-sidebar">
+      {/* Mobile Top Header (only visible on mobile screens <= 900px) */}
+      <header className="admin-mobile-header">
+        <div
+          className="admin-mobile-brand"
+          onClick={() => navigate('/dashboard')}
+        >
+          <div className="sidebar-brand-icon">
+            <Leaf size={18} color="#86EFAC" strokeWidth={2.5} />
+          </div>
+          <span className="brand-name">HelpingHand</span>
+          <span className="brand-tag">Admin</span>
+        </div>
+
+        <div className="admin-mobile-actions">
+          <button
+            type="button"
+            className="admin-mobile-logout-btn"
+            onClick={handleLogout}
+            title="Sign out of Admin Console"
+          >
+            <LogOut size={14} />
+            <span>Sign Out</span>
+          </button>
+
+          <button
+            type="button"
+            className="admin-mobile-menu-btn"
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </header>
+
+      {/* Backdrop overlay for mobile menu drawer */}
+      {mobileOpen && (
+        <div
+          className="admin-mobile-backdrop"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar (drawer on mobile, fixed column on desktop) */}
+      <aside className={`admin-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
         {/* Brand */}
         <div>
           <div
             className="admin-sidebar-brand"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => {
+              navigate('/dashboard');
+              setMobileOpen(false);
+            }}
           >
             <div className="sidebar-brand-icon">
               <Leaf size={20} color="#86EFAC" strokeWidth={2.5} />
@@ -39,7 +91,10 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
             <li>
               <button
                 className={`admin-nav-link ${currentPath === '/dashboard' || currentPath === '/' ? 'active' : ''}`}
-                onClick={() => navigate('/dashboard')}
+                onClick={() => {
+                  navigate('/dashboard');
+                  setMobileOpen(false);
+                }}
               >
                 <span className="nav-icon">
                   <LayoutDashboard size={16} strokeWidth={2} />
@@ -50,7 +105,10 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
             <li>
               <button
                 className={`admin-nav-link ${currentPath === '/ngo-list' || currentPath === '/ngo-verification' ? 'active' : ''}`}
-                onClick={() => navigate('/ngo-list')}
+                onClick={() => {
+                  navigate('/ngo-list');
+                  setMobileOpen(false);
+                }}
               >
                 <span className="nav-icon">
                   <BadgeCheck size={16} strokeWidth={2} />
@@ -64,7 +122,10 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
             <li>
               <button
                 className={`admin-nav-link ${currentPath === '/donators' || currentPath === '/user-accounts' ? 'active' : ''}`}
-                onClick={() => navigate('/donators')}
+                onClick={() => {
+                  navigate('/donators');
+                  setMobileOpen(false);
+                }}
               >
                 <span className="nav-icon">
                   <Users size={16} strokeWidth={2} />
@@ -78,7 +139,10 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
             <li>
               <button
                 className={`admin-nav-link ${currentPath === '/change-password' ? 'active' : ''}`}
-                onClick={() => navigate('/change-password')}
+                onClick={() => {
+                  navigate('/change-password');
+                  setMobileOpen(false);
+                }}
               >
                 <span className="nav-icon">
                   <KeyRound size={16} strokeWidth={2} />
@@ -92,7 +156,7 @@ export default function AdminSidebar({ pendingCount, usersCount }) {
         <div className="admin-sidebar-footer" />
       </aside>
 
-      {/* Fixed top-right logout button */}
+      {/* Fixed top-right logout button for desktop */}
       <button
         id="admin-logout-btn"
         className="btn-topright-logout"

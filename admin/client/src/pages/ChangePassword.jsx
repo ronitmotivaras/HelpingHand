@@ -86,13 +86,13 @@ export default function ChangePassword() {
       <AdminSidebar />
 
       <main className="admin-main">
-        <div className="admin-breadcrumb-bar" style={{ maxWidth: '520px', margin: '0 auto var(--space-4)' }}>
+        <div className="admin-breadcrumb-bar">
           <div>
             <h1 className="admin-page-title">Change Password</h1>
           </div>
         </div>
 
-        <div style={{ maxWidth: '520px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '560px' }}>
           <section className="admin-card-panel">
             <div className="panel-header">
               <h2 className="panel-title">
@@ -115,18 +115,6 @@ export default function ChangePassword() {
             </div>
 
             <form onSubmit={handleSubmit} style={{ padding: 'var(--space-5)' }}>
-              <p
-                style={{
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--color-text-secondary)',
-                  marginBottom: 'var(--space-5)',
-                  lineHeight: 1.65,
-                }}
-              >
-                Enter your current password to verify your identity, then choose a new password
-                with at least 6 characters.
-              </p>
-
               {/* Current Password */}
               <div className="mb-4">
                 <label
@@ -190,7 +178,7 @@ export default function ChangePassword() {
                     marginBottom: '6px',
                   }}
                 >
-                  New Password <span className="text-muted fw-normal" style={{ fontSize: 'var(--text-xs)' }}>(Minimum 6 characters)</span>
+                  New Password
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -198,7 +186,7 @@ export default function ChangePassword() {
                     name="newPassword"
                     type={showNew ? 'text' : 'password'}
                     className="admin-form-input"
-                    placeholder="Minimum 6 characters"
+                    placeholder="Enter password"
                     value={form.newPassword}
                     onChange={handleChange}
                     onPaste={(e) => e.preventDefault()}
