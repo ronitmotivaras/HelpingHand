@@ -139,31 +139,3 @@ npm start
 
 The admin panel will be available at **http://localhost:3001**.
 
----
-
-## 🔌 API Overview
-
-### Main Web API (`http://localhost:5000`)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/auth/register` | Register a new user |
-| POST | `/api/auth/login` | Login and receive JWT |
-| GET | `/api/donations` | List available food donations |
-| POST | `/api/donations` | Create a new donation listing |
-| GET | `/api/donations/:id` | Get a single donation's details |
-| PATCH | `/api/donations/:id` | Update donation status |
-| DELETE | `/api/donations/:id` | Delete a donation |
-| GET | `/api/profile` | Get current user's profile |
-| PATCH | `/api/profile` | Update profile |
-| POST | `/api/profile/apply-ngo` | Submit an NGO application |
-| GET | `/api/health` | Health check |
-
-### Admin API (`http://localhost:5001`)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/auth/login` | Admin login |
-| GET | `/api/users` | List all users |
-| PATCH | `/api/users/:id/ngo-status` | Approve or reject NGO application |
-| GET | `/api/health` | Health check |
