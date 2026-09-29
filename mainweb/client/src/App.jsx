@@ -7,7 +7,7 @@ import Dashboard from './pages/Dashboard';
 import FoodDetail from './pages/FoodDetail';
 import DonateFood from './pages/DonateFood';
 import Profile from './pages/Profile';
-import NgoRegistration from './pages/NgoRegistration';
+import ChangePassword from './pages/ChangePassword';
 import MyDonatedFood from './pages/MyDonatedFood';
 import './App.css';
 
@@ -49,13 +49,14 @@ export default function App() {
         }
       />
       <Route
-        path="/apply-ngo"
+        path="/change-password"
         element={
           <ProtectedRoute>
-            <NgoRegistration />
+            <ChangePassword />
           </ProtectedRoute>
         }
       />
+      <Route path="/apply-ngo" element={<Navigate to="/profile" replace />} />
       <Route
         path="/my-donations"
         element={

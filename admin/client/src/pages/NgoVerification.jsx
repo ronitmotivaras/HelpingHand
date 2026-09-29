@@ -119,7 +119,8 @@ export default function NgoVerification() {
                 const ngoName = req.ngoDetails?.ngoName || req.ngoDetails?.name || 'Unnamed NGO';
                 const city = req.ngoDetails?.city || req.city || '—';
                 const address = req.ngoDetails?.address || '—';
-                const contact = req.ngoDetails?.contactNum || req.ngoDetails?.contactNumber || req.mobile || '—';
+                const contactNum = req.ngoDetails?.contactNum || req.ngoDetails?.contactNumber || '—';
+                const coordinatorPhone = req.ngoDetails?.coordinatorPhone || req.mobile || '—';
 
                 return (
                   <div
@@ -171,13 +172,13 @@ export default function NgoVerification() {
                     </div>
 
                     <div className="row g-3 pt-2 border-top" style={{ borderColor: 'var(--color-border)' }}>
-                      <div className="col-md-4">
+                      <div className="col-md-3">
                         <div className="text-muted small d-flex align-items-center gap-1">
                           <MapPin size={13} /> City
                         </div>
                         <div className="fw-semibold mt-1">{city}</div>
                       </div>
-                      <div className="col-md-5">
+                      <div className="col-md-3">
                         <div className="text-muted small d-flex align-items-center gap-1">
                           <MapPin size={13} /> Address
                         </div>
@@ -185,9 +186,15 @@ export default function NgoVerification() {
                       </div>
                       <div className="col-md-3">
                         <div className="text-muted small d-flex align-items-center gap-1">
-                          <Phone size={13} /> Contact
+                          <Phone size={13} /> NGO Contact
                         </div>
-                        <div className="fw-semibold mt-1" style={{ fontFamily: 'monospace' }}>{contact}</div>
+                        <div className="fw-semibold mt-1" style={{ fontFamily: 'monospace' }}>{contactNum}</div>
+                      </div>
+                      <div className="col-md-3">
+                        <div className="text-muted small d-flex align-items-center gap-1">
+                          <Phone size={13} /> Coordinator Phone
+                        </div>
+                        <div className="fw-semibold mt-1" style={{ fontFamily: 'monospace' }}>{coordinatorPhone}</div>
                       </div>
                     </div>
                   </div>

@@ -16,10 +16,21 @@ function sanitizeUser(user) {
 
 async function register(req, res) {
   try {
-    const { name, mobile, password, confirmPassword, city } = req.body;
+    const {
+      name,
+      mobile,
+      password,
+      confirmPassword,
+      city,
+      accountType,
+      ngoName,
+      ngoAddress,
+      ngoContactNum,
+      coordinatorPhone,
+    } = req.body;
 
     if (!name || !mobile || !password || !confirmPassword || !city) {
-      return res.status(400).json({ message: 'All fields are required' });
+      return res.status(400).json({ message: 'All personal fields are required' });
     }
 
     if (password !== confirmPassword) {
@@ -29,6 +40,19 @@ async function register(req, res) {
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
+    if (password.length > 30) {
+      return res.status(400).json({ message: 'Password must be no more than 30 characters' });
+    }
+    if (/[^a-zA-Z0-9@]/.test(password)) {
+      return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
+    }
+
+    const isNgo = accountType === 'ngo';
+    if (isNgo) {
+      if (!ngoName || !ngoAddress || !ngoContactNum || !coordinatorPhone) {
+        return res.status(400).json({ message: 'All NGO fields are required' });
+      }
+    }
 
     const existing = await User.findOne({ mobile: String(mobile).trim() });
     if (existing) {
@@ -36,12 +60,24 @@ async function register(req, res) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({
+    const userPayload = {
       name: name.trim(),
       mobile: String(mobile).trim(),
       passwordHash,
       city: city.trim(),
-    });
+      ngoStatus: isNgo ? 'pending' : 'none',
+      ngoDetails: isNgo
+        ? {
+            ngoName: String(ngoName).trim(),
+            address: String(ngoAddress).trim(),
+            city: city.trim(),
+            contactNum: String(ngoContactNum).trim(),
+            coordinatorPhone: String(coordinatorPhone).trim(),
+          }
+        : {},
+    };
+
+    const user = await User.create(userPayload);
 
     return res.status(201).json({
       message: 'Account created successfully. Please sign in.',
@@ -64,12 +100,12 @@ async function login(req, res) {
 
     const user = await User.findOne({ mobile: String(mobile).trim() });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid mobile number or password' });
+      return res.status(401).json({ message: 'Incorrect mobile number or password' });
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
-      return res.status(401).json({ message: 'Invalid mobile number or password' });
+      return res.status(401).json({ message: 'Incorrect mobile number or password' });
     }
 
     const token = jwt.sign({ type: 'user', id: user._id }, process.env.USER_JWT_SECRET, {

@@ -304,6 +304,7 @@ export default function UserAccounts() {
                     placeholder="Enter min. 6 characters..."
                     value={editForm.newPassword}
                     onChange={(e) => setEditForm({ ...editForm, newPassword: e.target.value })}
+                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
 

@@ -15,6 +15,9 @@ export default function ChangePassword() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [newPasswordErrors, setNewPasswordErrors] = useState([]);
+  const [confirmError, setConfirmError] = useState('');
+
   function handleChange(e) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
@@ -22,12 +25,26 @@ export default function ChangePassword() {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (form.newPassword !== form.confirmPassword) {
-      toast.error('New passwords do not match');
-      return;
+    const pErrors = [];
+    if (!form.newPassword || form.newPassword.length < 6) {
+      pErrors.push('Password must be at least 6 characters');
     }
-    if (form.newPassword.length < 8) {
-      toast.error('New password must be at least 8 characters');
+    if (form.newPassword && form.newPassword.length > 30) {
+      pErrors.push('Password must be no more than 30 characters');
+    }
+    if (form.newPassword && /[^a-zA-Z0-9@]/.test(form.newPassword)) {
+      pErrors.push('Password can only contain letters, numbers, and @');
+    }
+
+    let cError = '';
+    if (form.newPassword !== form.confirmPassword) {
+      cError = 'Passwords do not match';
+    }
+
+    setNewPasswordErrors(pErrors);
+    setConfirmError(cError);
+
+    if (pErrors.length > 0 || cError) {
       return;
     }
 
@@ -39,6 +56,8 @@ export default function ChangePassword() {
       });
       toast.success('Password updated successfully');
       setForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setNewPasswordErrors([]);
+      setConfirmError('');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update password');
     } finally {
@@ -106,7 +125,7 @@ export default function ChangePassword() {
                 }}
               >
                 Enter your current password to verify your identity, then choose a new password
-                with at least 8 characters.
+                with at least 6 characters.
               </p>
 
               {/* Current Password */}
@@ -132,6 +151,7 @@ export default function ChangePassword() {
                     placeholder="Enter your current password"
                     value={form.currentPassword}
                     onChange={handleChange}
+                    onPaste={(e) => e.preventDefault()}
                     required
                     style={{ paddingRight: '44px' }}
                   />
@@ -171,7 +191,7 @@ export default function ChangePassword() {
                     marginBottom: '6px',
                   }}
                 >
-                  New Password
+                  New Password <span className="text-muted fw-normal" style={{ fontSize: 'var(--text-xs)' }}>(Minimum 6 characters)</span>
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -179,9 +199,10 @@ export default function ChangePassword() {
                     name="newPassword"
                     type={showNew ? 'text' : 'password'}
                     className="admin-form-input"
-                    placeholder="Min. 8 characters"
+                    placeholder="Minimum 6 characters"
                     value={form.newPassword}
                     onChange={handleChange}
+                    onPaste={(e) => e.preventDefault()}
                     required
                     style={{ paddingRight: '44px' }}
                   />
@@ -207,6 +228,21 @@ export default function ChangePassword() {
                     {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+
+                {newPasswordErrors.map((err, idx) => (
+                  <p
+                    key={idx}
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-danger)',
+                      marginTop: '4px',
+                      marginBottom: 0,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {err}
+                  </p>
+                ))}
 
                 {/* Strength bar */}
                 {strength && (
@@ -267,13 +303,11 @@ export default function ChangePassword() {
                     placeholder="Re-enter new password"
                     value={form.confirmPassword}
                     onChange={handleChange}
+                    onPaste={(e) => e.preventDefault()}
                     required
                     style={{
                       paddingRight: '44px',
-                      borderColor:
-                        form.confirmPassword && form.confirmPassword !== form.newPassword
-                          ? 'var(--color-danger)'
-                          : undefined,
+                      borderColor: confirmError ? 'var(--color-danger)' : undefined,
                     }}
                   />
                   <button
@@ -298,7 +332,7 @@ export default function ChangePassword() {
                     {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                {form.confirmPassword && form.confirmPassword !== form.newPassword && (
+                {confirmError && (
                   <p
                     style={{
                       fontSize: 'var(--text-xs)',
@@ -307,7 +341,7 @@ export default function ChangePassword() {
                       fontWeight: 500,
                     }}
                   >
-                    Passwords do not match
+                    {confirmError}
                   </p>
                 )}
               </div>

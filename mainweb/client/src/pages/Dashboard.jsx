@@ -40,17 +40,13 @@ export default function Dashboard() {
   return (
     <>
       <Navbar />
-      <main className="hh-page">
-        {/* Premium gradient page header */}
-        <div className="hh-page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+      <main className="hh-page" style={{ paddingBottom: '96px' }}>
+        {/* Premium gradient page header - hero band keeps only heading and subtext */}
+        <div className="hh-page-header">
           <div>
             <h1>Available Food in {user.city}</h1>
             <p>Surplus food listings available for pickup near you</p>
           </div>
-          <Link to="/donate" className="btn-hh" style={{ background: 'rgba(255,255,255,0.2)', border: '1.5px solid rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#fff', boxShadow: 'none' }}>
-            <Plus size={18} strokeWidth={2.5} />
-            <span>Donate Food</span>
-          </Link>
         </div>
 
         {/* Filter bar */}
@@ -140,6 +136,42 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+
+        {/* Floating "Donate food" pill button fixed to bottom-right */}
+        <Link
+          to="/donate"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: 'var(--color-primary)',
+            color: '#ffffff',
+            borderRadius: 'var(--radius-full)',
+            padding: '12px 22px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 600,
+            fontSize: 'var(--text-base)',
+            boxShadow: '0 4px 16px rgba(26, 122, 46, 0.35)',
+            zIndex: 1000,
+            textDecoration: 'none',
+            cursor: 'pointer',
+            transition: 'transform var(--transition), box-shadow var(--transition)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(26, 122, 46, 0.45)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(26, 122, 46, 0.35)';
+          }}
+          aria-label="Donate food"
+        >
+          <Plus size={18} strokeWidth={2.5} color="#ffffff" />
+          <span>Donate food</span>
+        </Link>
       </main>
     </>
   );

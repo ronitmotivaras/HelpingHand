@@ -5,6 +5,26 @@ async function getProfile(req, res) {
   return res.json(sanitizeUser(req.user));
 }
 
+async function updateProfile(req, res) {
+  try {
+    const { name, city } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Name is required' });
+    }
+    if (!city || !city.trim()) {
+      return res.status(400).json({ message: 'City is required' });
+    }
+
+    req.user.name = name.trim();
+    req.user.city = city.trim();
+    await req.user.save();
+
+    return res.json(sanitizeUser(req.user));
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to update profile' });
+  }
+}
+
 async function changePassword(req, res) {
   try {
     const { oldPassword, newPassword } = req.body;
@@ -13,6 +33,12 @@ async function changePassword(req, res) {
     }
     if (newPassword.length < 6) {
       return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+    if (newPassword.length > 30) {
+      return res.status(400).json({ message: 'New password must be no more than 30 characters' });
+    }
+    if (/[^a-zA-Z0-9@]/.test(newPassword)) {
+      return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
     }
 
     const ok = await bcrypt.compare(oldPassword, req.user.passwordHash);
@@ -57,4 +83,4 @@ async function applyNgo(req, res) {
   }
 }
 
-module.exports = { getProfile, changePassword, applyNgo };
+module.exports = { getProfile, updateProfile, changePassword, applyNgo };

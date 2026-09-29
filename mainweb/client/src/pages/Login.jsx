@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Leaf, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { Leaf, Phone, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -11,21 +11,51 @@ export default function Login() {
   const [mobile, setMobile] = useState(location.state?.mobile || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 
+  function handleMobileChange(val) {
+    setMobile(val);
+    if (fieldErrors.mobile) {
+      setFieldErrors((prev) => ({ ...prev, mobile: '' }));
+    }
+  }
+
+  function handlePasswordChange(val) {
+    setPassword(val);
+    if (fieldErrors.password) {
+      setFieldErrors((prev) => ({ ...prev, password: '' }));
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
+
+    const errors = {};
+    if (!mobile.trim()) {
+      errors.mobile = 'Please enter your mobile number';
+    }
+    if (!password) {
+      errors.password = 'Please enter your password';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    setFieldErrors({});
     setLoading(true);
     try {
       await login(mobile, password);
       toast.success('Welcome back to HelpingHand!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || 'Login failed. Please try again.');
+      toast.error(err.response?.data?.message || 'Incorrect mobile number or password');
     } finally {
       setLoading(false);
     }
@@ -40,7 +70,7 @@ export default function Login() {
         </div>
         <p className="food-card-meta mb-4">Community surplus food rescue network.</p>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="form-group mb-3">
             <label className="form-label" htmlFor="login-mobile">Registered Mobile Number</label>
             <div style={{ position: 'relative' }}>
@@ -59,14 +89,22 @@ export default function Login() {
               <input
                 id="login-mobile"
                 className="form-control"
-                style={{ paddingLeft: '2.4rem' }}
+                style={{
+                  paddingLeft: '2.4rem',
+                  borderColor: fieldErrors.mobile ? 'var(--color-danger)' : undefined,
+                }}
                 placeholder="e.g. 9876543210"
                 value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
+                onChange={(e) => handleMobileChange(e.target.value)}
                 autoFocus={!location.state?.mobile}
-                required
               />
             </div>
+            {fieldErrors.mobile && (
+              <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                <AlertCircle size={13} />
+                <span>{fieldErrors.mobile}</span>
+              </div>
+            )}
           </div>
 
           <div className="form-group mb-4">
@@ -88,12 +126,16 @@ export default function Login() {
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 className="form-control"
-                style={{ paddingLeft: '2.4rem', paddingRight: '2.8rem' }}
+                style={{
+                  paddingLeft: '2.4rem',
+                  paddingRight: '2.8rem',
+                  borderColor: fieldErrors.password ? 'var(--color-danger)' : undefined,
+                }}
                 placeholder="Enter your password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => handlePasswordChange(e.target.value)}
+                onPaste={(e) => e.preventDefault()}
                 autoFocus={Boolean(location.state?.mobile)}
-                required
               />
               <button
                 type="button"
@@ -116,6 +158,12 @@ export default function Login() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {fieldErrors.password && (
+              <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                <AlertCircle size={13} />
+                <span>{fieldErrors.password}</span>
+              </div>
+            )}
           </div>
 
           <button

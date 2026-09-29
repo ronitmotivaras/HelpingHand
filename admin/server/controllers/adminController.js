@@ -19,6 +19,7 @@ function sanitizeUser(user) {
       city: rawNgo.city || user.city || '',
       contactNum: rawNgo.contactNum || rawNgo.contactNumber || user.mobile || '',
       contactNumber: rawNgo.contactNumber || rawNgo.contactNum || user.mobile || '',
+      coordinatorPhone: rawNgo.coordinatorPhone || '',
     },
     createdAt: user.createdAt,
   };
@@ -53,7 +54,7 @@ async function adminLogin(req, res) {
       return res.status(401).json({ message: 'Invalid admin password' });
     }
 
-    const token = jwt.sign({ type: 'admin' }, process.env.ADMIN_JWT_SECRET, { expiresIn: '12h' });
+    const token = jwt.sign({ type: 'admin' }, process.env.ADMIN_JWT_SECRET, { expiresIn: '1h' });
     return res.json({ token });
   } catch (err) {
     return res.status(500).json({ message: 'Admin login failed' });
@@ -164,8 +165,14 @@ async function changePassword(req, res) {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: 'Both current and new password are required' });
     }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ message: 'New password must be at least 8 characters' });
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+    if (newPassword.length > 30) {
+      return res.status(400).json({ message: 'New password must be no more than 30 characters' });
+    }
+    if (/[^a-zA-Z0-9@]/.test(newPassword)) {
+      return res.status(400).json({ message: 'New password can only contain letters, numbers, and @' });
     }
 
     const admin = await Admin.findOne();
