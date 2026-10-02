@@ -22,15 +22,24 @@ import {
 import Navbar from '../components/Navbar';
 import api from '../api/axiosInstance';
 
-function getStatusBadge(status) {
-  if (status === 'accepted' || status === 'booked') {
-    return <span className="badge-status accepted">Accepted</span>;
-  }
+function isListingExpired(l) {
+  if (!l) return false;
+  if (l.status === 'expired') return true;
+  if (l.status === 'pickedUp') return false;
+  if (l.expiryAt && new Date(l.expiryAt).getTime() <= Date.now()) return true;
+  if (l.pickupTo && new Date(l.pickupTo).getTime() <= Date.now()) return true;
+  return false;
+}
+
+function getStatusBadge(status, expired = false) {
   if (status === 'pickedUp') {
     return <span className="badge-status pickedUp">Picked Up</span>;
   }
-  if (status === 'expired') {
+  if (status === 'expired' || expired) {
     return <span className="badge-status expired">Expired</span>;
+  }
+  if (status === 'accepted' || status === 'booked') {
+    return <span className="badge-status accepted">Accepted</span>;
   }
   return <span className="badge-status available">Available</span>;
 }
@@ -57,7 +66,7 @@ function isExpiringSoon(expiryDateStr) {
 export default function DonorDashboard() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed' | 'all'
+  const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed' | 'expired' | 'all'
   const [processingId, setProcessingId] = useState(null);
   const [selectedNgo, setSelectedNgo] = useState(null);
   const [loadingNgoProfile, setLoadingNgoProfile] = useState(false);
@@ -99,16 +108,23 @@ export default function DonorDashboard() {
 
   // Stats calculation
   const totalCount = listings.length;
-  const activeCount = listings.filter((l) => l.status === 'available' || l.status === 'accepted' || l.status === 'booked').length;
   const pickedUpCount = listings.filter((l) => l.status === 'pickedUp').length;
+  const expiredCount = listings.filter((l) => isListingExpired(l)).length;
+  const activeCount = listings.filter(
+    (l) => !isListingExpired(l) && (l.status === 'available' || l.status === 'accepted' || l.status === 'booked')
+  ).length;
 
   // Filter listings by tab
   const filteredListings = listings.filter((l) => {
+    const expired = isListingExpired(l);
     if (activeTab === 'active') {
-      return l.status === 'available' || l.status === 'accepted' || l.status === 'booked';
+      return !expired && (l.status === 'available' || l.status === 'accepted' || l.status === 'booked');
     }
     if (activeTab === 'completed') {
       return l.status === 'pickedUp';
+    }
+    if (activeTab === 'expired') {
+      return expired;
     }
     return true;
   });
@@ -187,9 +203,9 @@ export default function DonorDashboard() {
           </Link>
         </div>
 
-        {/* 3 Stat Cards */}
+        {/* 4 Stat Cards */}
         <div className="row g-3 mb-4">
-          <div className="col-md-4">
+          <div className="col-6 col-md-3">
             <div className="donor-stat-card">
               <div className="donor-stat-icon total">
                 <Package size={22} />
@@ -200,7 +216,7 @@ export default function DonorDashboard() {
               </div>
             </div>
           </div>
-          <div className="col-md-4">
+          <div className="col-6 col-md-3">
             <div className="donor-stat-card">
               <div className="donor-stat-icon active">
                 <Clock size={22} />
@@ -211,7 +227,7 @@ export default function DonorDashboard() {
               </div>
             </div>
           </div>
-          <div className="col-md-4">
+          <div className="col-6 col-md-3">
             <div className="donor-stat-card">
               <div className="donor-stat-icon completed">
                 <CheckCircle2 size={22} />
@@ -222,9 +238,20 @@ export default function DonorDashboard() {
               </div>
             </div>
           </div>
+          <div className="col-6 col-md-3">
+            <div className="donor-stat-card">
+              <div className="donor-stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+                <AlertCircle size={22} />
+              </div>
+              <div>
+                <div className="donor-stat-value">{expiredCount}</div>
+                <div className="donor-stat-label">Expired Food</div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Tabs: Active / Completed / All */}
+        {/* Tabs: Active / Completed / Expired / All */}
         <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
           <div className="donor-nav-tabs">
             <button
@@ -240,6 +267,13 @@ export default function DonorDashboard() {
             >
               <span>Completed</span>
               <span className="donor-tab-count">{pickedUpCount}</span>
+            </button>
+            <button
+              className={`donor-nav-tab ${activeTab === 'expired' ? 'active' : ''}`}
+              onClick={() => setActiveTab('expired')}
+            >
+              <span>Expired</span>
+              <span className="donor-tab-count">{expiredCount}</span>
             </button>
             <button
               className={`donor-nav-tab ${activeTab === 'all' ? 'active' : ''}`}
@@ -275,12 +309,18 @@ export default function DonorDashboard() {
                 ? 'No active donations right now'
                 : activeTab === 'completed'
                 ? 'No completed pickups yet'
+                : activeTab === 'expired'
+                ? 'No expired food donations'
                 : 'No donations posted yet'}
             </h3>
             <p className="empty-state-text mb-4">
               {activeTab === 'active'
                 ? 'Have surplus food to share? Create a new listing and connect with local NGOs.'
-                : 'When NGOs pick up your food, they will appear in your Completed history.'}
+                : activeTab === 'completed'
+                ? 'When NGOs pick up your food, they will appear in your Completed history.'
+                : activeTab === 'expired'
+                ? 'Listings whose pickup window or consume-by time has passed move here automatically.'
+                : 'Start donating food to help those in need.'}
             </p>
             <Link to="/donate" className="btn-hh-secondary d-inline-flex align-items-center gap-2">
               <Plus size={16} />
@@ -294,11 +334,15 @@ export default function DonorDashboard() {
           <div className="d-flex flex-column gap-4">
             {filteredListings.map((listing) => {
               const isNonVeg = listing.foodType === 'nonveg';
+              const isMixed = listing.foodType === 'mixed';
+              const dietClass = isNonVeg ? 'non-veg' : isMixed ? 'mixed' : 'veg';
+              const dietTitle = isNonVeg ? 'Non-Vegetarian' : isMixed ? 'Mixed (Veg & Non-Veg)' : 'Vegetarian';
               const isBusy = processingId === listing.id;
               const urgent = isExpiringSoon(listing.expiryAt);
 
-              const isAccepted = listing.status === 'accepted' || listing.status === 'booked';
-              const isAvailable = listing.status === 'available';
+              const expired = isListingExpired(listing);
+              const isAccepted = !expired && (listing.status === 'accepted' || listing.status === 'booked');
+              const isAvailable = !expired && listing.status === 'available';
               const isPickedUp = listing.status === 'pickedUp';
 
               const pendingRequests = (listing.requests || []).filter((r) => r.status === 'pending');
@@ -307,19 +351,26 @@ export default function DonorDashboard() {
               const acceptedNgo = listing.acceptedNgo || (listing.bookedByNgoName ? { ngoName: listing.bookedByNgoName } : null);
 
               return (
-                <div className="hh-card mb-0" key={listing.id} style={{ border: isAccepted ? '1px solid #fde68a' : undefined }}>
+                <div
+                  className="hh-card mb-0"
+                  key={listing.id}
+                  style={{
+                    border: isAccepted ? '1px solid #fde68a' : expired && !isPickedUp ? '1px solid #fecaca' : undefined,
+                    opacity: expired && !isPickedUp ? 0.92 : 1,
+                  }}
+                >
                   {/* Card top row */}
                   <div className="d-flex justify-content-between align-items-start gap-2 mb-3 flex-wrap">
                     <div>
                       <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                         <span
-                          className={`diet-symbol ${isNonVeg ? 'non-veg' : 'veg'}`}
-                          title={isNonVeg ? 'Non-Vegetarian' : 'Vegetarian'}
+                          className={`diet-symbol ${dietClass}`}
+                          title={dietTitle}
                         >
                           <span className="diet-dot" />
                         </span>
                         <h3 className="card-title m-0">{listing.foodName}</h3>
-                        {urgent && !isPickedUp && listing.status !== 'expired' && (
+                        {urgent && !isPickedUp && !expired && (
                           <span className="badge-use-quickly">
                             <Flame size={12} />
                             <span>Use quickly</span>
@@ -343,7 +394,7 @@ export default function DonorDashboard() {
                     </div>
 
                     <div className="d-flex align-items-center gap-2">
-                      {getStatusBadge(listing.status)}
+                      {getStatusBadge(listing.status, expired)}
                     </div>
                   </div>
 
@@ -378,11 +429,31 @@ export default function DonorDashboard() {
                         <Clock size={13} />
                         <span>Consume Before:</span>
                       </div>
-                      <div className="fw-semibold mt-1" style={{ color: urgent ? 'var(--color-danger)' : 'inherit' }}>
+                      <div className="fw-semibold mt-1" style={{ color: urgent && !expired ? 'var(--color-danger)' : 'inherit' }}>
                         {formatDate(listing.expiryAt)}
                       </div>
                     </div>
                   </div>
+
+                  {/* CASE 0: EXPIRED (not picked up) - Informative alert */}
+                  {expired && !isPickedUp && (
+                    <div
+                      className="p-3 rounded mt-2"
+                      style={{
+                        background: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        color: '#991b1b',
+                      }}
+                    >
+                      <div className="d-flex align-items-center gap-2">
+                        <AlertCircle size={16} />
+                        <strong style={{ fontSize: 'var(--text-sm)' }}>Food Has Expired</strong>
+                      </div>
+                      <p className="mb-0 mt-1" style={{ fontSize: 'var(--text-sm)', color: '#7f1d1d' }}>
+                        The pickup window or consume-by time for this listing has passed. It has been automatically moved out of active listings and hidden from NGOs so it cannot be claimed or consumed.
+                      </p>
+                    </div>
+                  )}
 
                   {/* CASE 1: AVAILABLE - Show incoming NGO requests */}
                   {isAvailable && (

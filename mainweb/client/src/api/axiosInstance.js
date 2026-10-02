@@ -29,6 +29,12 @@ api.interceptors.response.use(
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login?blocked=1';
       }
+    } else if (error.response?.status === 401 && !error.config?.url?.includes('/login')) {
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('hh_user');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login?expired=1';
+      }
     }
     return Promise.reject(error);
   }

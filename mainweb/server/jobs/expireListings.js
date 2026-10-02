@@ -8,10 +8,11 @@ function startExpireListingsJob() {
     try {
       const now = new Date();
 
-      // Find available listings that have passed pickupTo
+      // Find active listings that have passed expiryAt or pickupTo
       const expiredDonations = await FoodDonation.find({
-        status: 'available',
+        status: { $in: ['available', 'accepted', 'booked'] },
         $or: [
+          { expiryAt: { $lt: now } },
           { pickupTo: { $lt: now } },
           { pickupTo: { $exists: false }, availableUpto: { $lt: now } },
         ],

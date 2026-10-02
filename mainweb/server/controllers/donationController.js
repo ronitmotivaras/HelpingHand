@@ -139,17 +139,39 @@ async function listDonations(req, res) {
 
     const now = new Date();
 
+    // Auto-expire listings where expiryAt or pickupTo has passed
+    await FoodDonation.updateMany(
+      {
+        status: { $in: ['available', 'accepted', 'booked'] },
+        $or: [
+          { expiryAt: { $lt: now } },
+          { pickupTo: { $lt: now } },
+        ],
+      },
+      { $set: { status: 'expired' } }
+    );
+
     // Hidden data: Hide listings from blocked users
     const blockedUsers = await User.find({ isBlocked: true }, '_id');
     const blockedIds = blockedUsers.map((u) => u._id);
 
-    // NGO feed shows ONLY "available" listings where pickupTo has not passed
+    // NGO feed shows ONLY active "available" listings where neither expiryAt nor pickupTo has passed
     const filter = {
       status: 'available',
       donorId: { $nin: blockedIds },
-      $or: [
-        { pickupTo: { $gt: now } },
-        { pickupTo: { $exists: false }, availableUpto: { $gt: now } },
+      $and: [
+        {
+          $or: [
+            { expiryAt: { $gt: now } },
+            { expiryAt: { $exists: false } },
+          ],
+        },
+        {
+          $or: [
+            { pickupTo: { $gt: now } },
+            { pickupTo: { $exists: false }, availableUpto: { $gt: now } },
+          ],
+        },
       ],
     };
 
@@ -157,7 +179,7 @@ async function listDonations(req, res) {
       filter.city = new RegExp(`^${escapeRegex(city)}$`, 'i');
     }
 
-    if (foodType === 'veg' || foodType === 'nonveg') {
+    if (foodType === 'veg' || foodType === 'nonveg' || foodType === 'mixed') {
       filter.foodType = foodType;
     }
 
@@ -174,9 +196,9 @@ async function listDonations(req, res) {
       });
     }
 
-    let sortOption = { createdAt: -1 };
-    if (sort === 'expiring') {
-      sortOption = { pickupTo: 1, expiryAt: 1, createdAt: -1 };
+    let sortOption = { expiryAt: 1, pickupTo: 1, createdAt: -1 };
+    if (sort === 'newest') {
+      sortOption = { createdAt: -1 };
     }
 
     const donations = await FoodDonation.find(filter).sort(sortOption);
@@ -188,6 +210,20 @@ async function listDonations(req, res) {
 
 async function getMyHistory(req, res) {
   try {
+    const now = new Date();
+    // Auto-expire donor's own elapsed listings
+    await FoodDonation.updateMany(
+      {
+        donorId: req.user._id,
+        status: { $in: ['available', 'accepted', 'booked'] },
+        $or: [
+          { expiryAt: { $lt: now } },
+          { pickupTo: { $lt: now } },
+        ],
+      },
+      { $set: { status: 'expired' } }
+    );
+
     const blockedUsers = await User.find({ isBlocked: true }, '_id');
     const blockedIds = blockedUsers.map((u) => u._id);
 
@@ -270,12 +306,20 @@ async function createDonation(req, res) {
       }
     }
 
-    if (!foodType || (foodType !== 'veg' && foodType !== 'nonveg')) {
-      return res.status(400).json({ message: 'Food type must be veg or nonveg' });
+    if (!foodType || (foodType !== 'veg' && foodType !== 'nonveg' && foodType !== 'mixed')) {
+      return res.status(400).json({ message: 'Food type must be veg, nonveg, or mixed' });
     }
 
     if (!contactName || !contactName.trim()) {
       return res.status(400).json({ message: 'Contact person name is required' });
+    }
+
+    if (!/^[a-zA-Z\s]+$/.test(contactName.trim())) {
+      return res.status(400).json({ message: 'Contact name can only contain alphabets and spaces' });
+    }
+
+    if (contactName.trim().length > 100) {
+      return res.status(400).json({ message: 'Contact name cannot exceed 100 characters' });
     }
 
     const cleanPhone = String(phone || '').trim();
@@ -306,6 +350,14 @@ async function createDonation(req, res) {
     const nowWithBuffer = new Date(Date.now() - 60000);
     if (fromDate < nowWithBuffer) {
       return res.status(400).json({ message: 'Pickup start time cannot be in the past' });
+    }
+
+    if (toDate < nowWithBuffer) {
+      return res.status(400).json({ message: 'Pickup available end time cannot be in the past' });
+    }
+
+    if (expDate < nowWithBuffer) {
+      return res.status(400).json({ message: 'Food expiry time cannot be in the past' });
     }
 
     if (toDate <= fromDate) {

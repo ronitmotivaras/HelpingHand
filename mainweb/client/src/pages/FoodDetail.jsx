@@ -64,7 +64,11 @@ export default function FoodDetail() {
   }, [id]);
 
   const isNonVeg =
-    donation?.foodType?.toLowerCase().includes('non') || donation?.type?.toLowerCase().includes('non');
+    donation?.foodType?.toLowerCase() === 'nonveg' || donation?.type?.toLowerCase() === 'nonveg';
+  const isMixed =
+    donation?.foodType?.toLowerCase() === 'mixed' || donation?.type?.toLowerCase() === 'mixed';
+  const dietClass = isNonVeg ? 'non-veg' : isMixed ? 'mixed' : 'veg';
+  const dietTitle = isNonVeg ? 'Non-Vegetarian' : isMixed ? 'Mixed (Veg & Non-Veg)' : 'Vegetarian';
   const urgent = isExpiringSoon(donation?.expiryAt);
 
   const isOwner = Boolean(user && donation && String(donation.donorId) === String(user.id || user._id));
@@ -136,8 +140,8 @@ export default function FoodDetail() {
               <div>
                 <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                   <span
-                    className={`diet-symbol ${isNonVeg ? 'non-veg' : 'veg'}`}
-                    title={isNonVeg ? 'Non-Vegetarian' : 'Vegetarian'}
+                    className={`diet-symbol ${dietClass}`}
+                    title={dietTitle}
                   >
                     <span className="diet-dot" />
                   </span>
@@ -238,10 +242,10 @@ export default function FoodDetail() {
             <div className="detail-row">
               <span>Food Category</span>
               <strong className="d-flex align-items-center gap-2">
-                <span className={`diet-symbol ${isNonVeg ? 'non-veg' : 'veg'}`}>
+                <span className={`diet-symbol ${dietClass}`}>
                   <span className="diet-dot" />
                 </span>
-                <span>{isNonVeg ? 'Non-Vegetarian' : 'Vegetarian'}</span>
+                <span>{dietTitle}</span>
               </strong>
             </div>
 

@@ -41,35 +41,6 @@ export default function Navbar() {
         <Link to="/" className="hh-brand d-flex align-items-center gap-2">
           <Leaf size={22} strokeWidth={2.5} color="var(--color-primary)" />
           <span>HelpingHand</span>
-          {isApprovedNgo ? (
-            <span
-              className="badge-status approved d-none d-sm-inline-flex align-items-center gap-1"
-              style={{ fontSize: '11px', padding: '2px 8px' }}
-            >
-              <BadgeCheck size={12} />
-              <span>NGO Partner</span>
-            </span>
-          ) : isNgo ? (
-            <span
-              className="badge-status pending d-none d-sm-inline-flex align-items-center gap-1"
-              style={{ fontSize: '11px', padding: '2px 8px' }}
-            >
-              <Clock size={12} />
-              <span>NGO Pending</span>
-            </span>
-          ) : (
-            <span
-              className="badge-status d-none d-sm-inline-flex align-items-center gap-1"
-              style={{
-                background: 'var(--color-primary-light)',
-                color: 'var(--color-primary)',
-                fontSize: '11px',
-                padding: '2px 8px',
-              }}
-            >
-              <span>Donor</span>
-            </span>
-          )}
         </Link>
 
         <div className="hh-nav-links d-flex align-items-center gap-2">

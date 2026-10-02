@@ -69,9 +69,14 @@ export default function Login() {
     setBlockedWarning('');
     setLoading(true);
     try {
-      await login(mobile.trim(), password);
+      const loggedUser = await login(mobile.trim(), password);
       toast.success('Welcome back to HelpingHand!');
-      navigate('/');
+      const isNgo = Boolean(loggedUser?.ngoStatus && loggedUser.ngoStatus !== 'none');
+      if (isNgo) {
+        navigate('/feed');
+      } else {
+        navigate('/donor');
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Incorrect mobile number or password';
       if (err.response?.status === 403 || err.response?.data?.isBlocked || msg.includes('blocked')) {

@@ -6,7 +6,6 @@ import {
   Inbox,
   MapPin,
   Search,
-  ArrowUpDown,
   BadgeCheck,
   Clock,
   ShieldAlert,
@@ -23,7 +22,6 @@ export default function Dashboard() {
   const [selectedCity, setSelectedCity] = useState(user?.city || 'Ahmedabad');
   const [foodType, setFoodType] = useState('all');
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('newest'); // 'newest' | 'expiring'
   const [donations, setDonations] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -38,7 +36,7 @@ export default function Dashboard() {
       try {
         const params = {
           city: selectedCity,
-          sort,
+          sort: 'expiring',
         };
         if (foodType !== 'all') {
           params.foodType = foodType;
@@ -48,7 +46,15 @@ export default function Dashboard() {
         }
 
         const { data } = await api.get('/donations', { params });
-        if (!cancelled) setDonations(data);
+        // Guaranteed ascending order of expiry: 1st expiring soon, then 2nd, etc.
+        const sorted = Array.isArray(data)
+          ? [...data].sort((a, b) => {
+              const aExp = a.expiryAt ? new Date(a.expiryAt).getTime() : (a.pickupTo ? new Date(a.pickupTo).getTime() : Infinity);
+              const bExp = b.expiryAt ? new Date(b.expiryAt).getTime() : (b.pickupTo ? new Date(b.pickupTo).getTime() : Infinity);
+              return aExp - bExp;
+            })
+          : [];
+        if (!cancelled) setDonations(sorted);
       } catch (err) {
         if (!cancelled) setError(err.response?.data?.message || 'Failed to load food listings');
       } finally {
@@ -64,7 +70,7 @@ export default function Dashboard() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [foodType, selectedCity, search, sort]);
+  }, [foodType, selectedCity, search]);
 
   // Combined list of cities ensuring user's city is included
   const cityOptions = Array.from(new Set([...CITIES, ...(user?.city ? [user.city] : [])]));
@@ -197,9 +203,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Filter bar: Diet Type and Sort */}
+        {/* Filter bar: Diet Type (All and Veg only) */}
         <div className="d-flex align-items-center justify-content-between gap-3 mb-4 flex-wrap">
-          {/* Veg / Non-Veg Diet Filter */}
+          {/* Veg Diet Filter */}
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <div className="d-flex align-items-center gap-1">
               <SlidersHorizontal size={14} color="var(--color-text-muted)" />
@@ -220,38 +226,6 @@ export default function Dashboard() {
                   <span className="diet-dot" style={{ width: '6px', height: '6px' }} />
                 </span>
                 <span>Veg</span>
-              </button>
-              <button
-                className={`filter-btn d-inline-flex align-items-center gap-1 ${foodType === 'nonveg' ? 'active' : ''}`}
-                onClick={() => setFoodType('nonveg')}
-              >
-                <span className="diet-symbol non-veg" style={{ width: '12px', height: '12px' }}>
-                  <span className="diet-dot" style={{ width: '6px', height: '6px' }} />
-                </span>
-                <span>Non-Veg</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Sort: Expiring Soonest vs Newest */}
-          <div className="d-flex align-items-center gap-2">
-            <div className="d-flex align-items-center gap-1">
-              <ArrowUpDown size={14} color="var(--color-text-muted)" />
-              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontWeight: 600 }}>Sort:</span>
-            </div>
-            <div className="filter-button-group">
-              <button
-                className={`filter-btn ${sort === 'newest' ? 'active' : ''}`}
-                onClick={() => setSort('newest')}
-              >
-                Newest
-              </button>
-              <button
-                className={`filter-btn ${sort === 'expiring' ? 'active' : ''}`}
-                onClick={() => setSort('expiring')}
-                title="Sort by pickup window & expiry time closing soonest"
-              >
-                Expiring Soonest
               </button>
             </div>
           </div>

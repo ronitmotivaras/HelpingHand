@@ -35,7 +35,7 @@ const foodDonationSchema = new mongoose.Schema({
   items: { type: [foodItemSchema], default: [] },
   foodName: { type: String, trim: true, default: '' },
   quantity: { type: String, trim: true, default: '' },
-  foodType: { type: String, enum: ['veg', 'nonveg'], required: true },
+  foodType: { type: String, enum: ['veg', 'nonveg', 'mixed'], required: true },
 
   pickupFrom: { type: Date },
   pickupTo: { type: Date },

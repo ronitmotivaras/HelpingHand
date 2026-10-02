@@ -23,8 +23,13 @@ function isExpiringSoon(expiryDateStr) {
 
 export default function FoodCard({ donation }) {
   const isNonVeg =
-    donation.foodType?.toLowerCase().includes('non') ||
-    donation.type?.toLowerCase().includes('non');
+    donation.foodType?.toLowerCase() === 'nonveg' ||
+    donation.type?.toLowerCase() === 'nonveg';
+  const isMixed =
+    donation.foodType?.toLowerCase() === 'mixed' ||
+    donation.type?.toLowerCase() === 'mixed';
+  const dietClass = isNonVeg ? 'non-veg' : isMixed ? 'mixed' : 'veg';
+  const dietTitle = isNonVeg ? 'Non-Vegetarian' : isMixed ? 'Mixed (Veg & Non-Veg)' : 'Vegetarian';
   const urgent = isExpiringSoon(donation.expiryAt);
 
   return (
@@ -34,8 +39,8 @@ export default function FoodCard({ donation }) {
         <div className="food-card-top">
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <span
-              className={`diet-symbol ${isNonVeg ? 'non-veg' : 'veg'}`}
-              title={isNonVeg ? 'Non-Vegetarian' : 'Vegetarian'}
+              className={`diet-symbol ${dietClass}`}
+              title={dietTitle}
             >
               <span className="diet-dot" />
             </span>

@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Plus, Trash2, AlertTriangle, AlertCircle, Calendar, Clock, Package } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, AlertTriangle, AlertCircle, Calendar, Clock, Package, Pencil } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
@@ -55,6 +55,7 @@ export default function DonateFood() {
     address: '',
   });
 
+  const [nameError, setNameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -62,11 +63,24 @@ export default function DonateFood() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function handleContactNameChange(val) {
+    if (val.length > 100) return;
+    updateForm('contactName', val);
+    if (!val.trim()) {
+      setNameError('Contact person name is required');
+    } else if (!/^[a-zA-Z\s]+$/.test(val)) {
+      setNameError('Contact name can only contain alphabets and spaces');
+    } else {
+      setNameError('');
+    }
+  }
+
   function handlePhoneChange(val) {
-    updateForm('phone', val);
+    const cleaned = val.replace(/[^0-9]/g, '').slice(0, 10);
+    updateForm('phone', cleaned);
     if (/[^0-9]/.test(val)) {
       setPhoneError('Only numbers (0-9) are allowed. No characters, symbols, or spaces.');
-    } else if (val.length > 0 && val.length !== 10) {
+    } else if (cleaned.length > 0 && cleaned.length !== 10) {
       setPhoneError('Mobile number must be exactly 10 digits');
     } else {
       setPhoneError('');
@@ -142,9 +156,28 @@ export default function DonateFood() {
       }
     }
 
+    if (!form.contactName.trim()) {
+      setNameError('Contact person name is required');
+      toast.error('Contact person name is required');
+      return;
+    }
+
+    if (!/^[a-zA-Z\s]+$/.test(form.contactName.trim())) {
+      setNameError('Contact name can only contain alphabets and spaces');
+      toast.error('Contact name can only contain alphabets and spaces');
+      return;
+    }
+
+    if (form.contactName.trim().length > 100) {
+      setNameError('Contact name cannot exceed 100 characters');
+      toast.error('Contact name cannot exceed 100 characters');
+      return;
+    }
+
     const mError = validateMobile(form.phone);
     if (mError) {
       setPhoneError(mError);
+      toast.error(mError);
       return;
     }
 
@@ -162,9 +195,19 @@ export default function DonateFood() {
     const toDate = new Date(form.pickupTo);
     const expDate = new Date(form.expiryAt);
 
-    // Rule: pickupFrom not in the past (minimum current time)
-    if (fromDate.getTime() < Date.now() - 30000) {
+    const nowWithBuffer = Date.now() - 30000;
+    if (fromDate.getTime() < nowWithBuffer) {
       toast.error('Pickup start time cannot be in the past. Current time is the minimum.');
+      return;
+    }
+
+    if (toDate.getTime() < nowWithBuffer) {
+      toast.error('Pickup available end time cannot be in the past. Current time is the minimum.');
+      return;
+    }
+
+    if (expDate.getTime() < nowWithBuffer) {
+      toast.error('Food expiry time cannot be in the past. Current time is the minimum.');
       return;
     }
 
@@ -319,11 +362,26 @@ export default function DonateFood() {
                 >
                   <option value="veg">Vegetarian (Veg)</option>
                   <option value="nonveg">Non-Vegetarian (Non-Veg)</option>
+                  <option value="mixed">Mixed (Veg &amp; Non-Veg)</option>
                 </select>
+                <div className="text-muted" style={{ fontSize: '11px', marginTop: '3px' }}>
+                  Choose Mixed if donation includes both veg and non-veg dishes
+                </div>
               </div>
 
               <div className="col-sm-6 form-group">
-                <label className="form-label" htmlFor="donation-city">City</label>
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <label className="form-label mb-0" htmlFor="donation-city">City</label>
+                  <button
+                    type="button"
+                    className="input-edit-btn"
+                    onClick={() => document.getElementById('donation-city')?.focus()}
+                    title="Change city for this order"
+                  >
+                    <Pencil size={12} />
+                    <span>Edit</span>
+                  </button>
+                </div>
                 <select
                   id="donation-city"
                   className="form-select"
@@ -338,36 +396,78 @@ export default function DonateFood() {
                     </option>
                   ))}
                 </select>
+                <div className="text-muted" style={{ fontSize: '11px', marginTop: '3px' }}>
+                  Update if pickup location is in another city
+                </div>
               </div>
             </div>
 
             {/* Contact Person & Phone */}
             <div className="row g-3 mb-3">
               <div className="col-sm-6 form-group">
-                <label className="form-label" htmlFor="contact-name">Contact Person</label>
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <label className="form-label mb-0" htmlFor="contact-name">Contact Person</label>
+                  <button
+                    type="button"
+                    className="input-edit-btn"
+                    onClick={() => document.getElementById('contact-name')?.focus()}
+                    title="Edit contact person for this order"
+                  >
+                    <Pencil size={12} />
+                    <span>Edit</span>
+                  </button>
+                </div>
                 <input
                   id="contact-name"
-                  className="form-control"
+                  className={`form-control ${nameError ? 'is-invalid' : ''}`}
+                  placeholder="Full name (alphabets only, max 100)"
+                  maxLength={100}
                   value={form.contactName}
-                  onChange={(e) => updateForm('contactName', e.target.value)}
+                  onChange={(e) => handleContactNameChange(e.target.value)}
                   required
                 />
+                {nameError ? (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{nameError}</span>
+                  </div>
+                ) : (
+                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '3px' }}>
+                    Alphabets and spaces only (max 100 characters)
+                  </div>
+                )}
               </div>
 
               <div className="col-sm-6 form-group">
-                <label className="form-label" htmlFor="contact-phone">Phone for Pickup Coordination</label>
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <label className="form-label mb-0" htmlFor="contact-phone">Phone for Pickup Coordination</label>
+                  <button
+                    type="button"
+                    className="input-edit-btn"
+                    onClick={() => document.getElementById('contact-phone')?.focus()}
+                    title="Edit phone number for this order"
+                  >
+                    <Pencil size={12} />
+                    <span>Edit</span>
+                  </button>
+                </div>
                 <input
                   id="contact-phone"
-                  className="form-control"
+                  className={`form-control ${phoneError ? 'is-invalid' : ''}`}
                   placeholder="10-digit mobile number"
+                  maxLength={10}
                   value={form.phone}
                   onChange={(e) => handlePhoneChange(e.target.value)}
                   required
                 />
-                {phoneError && (
+                {phoneError ? (
                   <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                     <AlertCircle size={13} />
                     <span>{phoneError}</span>
+                  </div>
+                ) : (
+                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '3px' }}>
+                    10 numeric digits only
                   </div>
                 )}
               </div>
@@ -407,7 +507,7 @@ export default function DonateFood() {
                   <input
                     id="pickup-to"
                     type="datetime-local"
-                    min={form.pickupFrom || currentMinTime}
+                    min={form.pickupFrom && form.pickupFrom > currentMinTime ? form.pickupFrom : currentMinTime}
                     onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
                     value={form.pickupTo}
@@ -426,7 +526,7 @@ export default function DonateFood() {
                   <input
                     id="expiry-at"
                     type="datetime-local"
-                    min={form.pickupFrom || currentMinTime}
+                    min={form.pickupFrom && form.pickupFrom > currentMinTime ? form.pickupFrom : currentMinTime}
                     onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
                     value={form.expiryAt}

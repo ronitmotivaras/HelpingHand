@@ -9,8 +9,9 @@ async function getProfile(req, res) {
 
 async function updateProfile(req, res) {
   try {
-    const { name, mobile, city } = req.body;
-    if (!name || !name.trim()) {
+    const { name, mobile, city, coordinatorName, address, ngoName } = req.body;
+    const finalName = (ngoName || name || '').trim();
+    if (!finalName) {
       return res.status(400).json({ message: 'Name is required' });
     }
     if (!mobile || !String(mobile).trim()) {
@@ -37,8 +38,24 @@ async function updateProfile(req, res) {
       req.user.mobile = trimmedMobile;
     }
 
-    req.user.name = name.trim();
+    req.user.name = finalName;
     req.user.city = city.trim();
+
+    // If NGO user, update ngoDetails fields
+    if (req.user.ngoStatus && req.user.ngoStatus !== 'none') {
+      req.user.ngoDetails = req.user.ngoDetails || {};
+      req.user.ngoDetails.ngoName = finalName;
+      req.user.ngoDetails.city = city.trim();
+      req.user.ngoDetails.contactNum = trimmedMobile;
+      if (coordinatorName !== undefined) {
+        req.user.ngoDetails.coordinatorName = String(coordinatorName || '').trim();
+      }
+      if (address !== undefined) {
+        req.user.ngoDetails.address = String(address || '').trim();
+      }
+      req.user.markModified('ngoDetails');
+    }
+
     await req.user.save();
 
     return res.json(sanitizeUser(req.user));

@@ -199,7 +199,7 @@ async function login(req, res) {
     }
 
     const token = jwt.sign({ type: 'user', id: user._id }, process.env.USER_JWT_SECRET, {
-      expiresIn: '7d',
+      expiresIn: '5d',
     });
 
     return res.json({ token, user: sanitizeUser(user) });

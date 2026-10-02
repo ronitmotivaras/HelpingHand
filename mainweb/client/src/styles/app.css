@@ -587,6 +587,21 @@ a:hover { color: var(--color-primary-hover); }
   -webkit-appearance: none;
 }
 
+.form-select,
+select.form-control,
+select {
+  background-color: var(--color-surface);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2315803d' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.2' d='m3 6 5 5 5-5'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 15px 11px;
+  padding-right: 42px !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
 .form-control::placeholder { color: var(--color-text-muted); }
 
 .form-control:focus,
@@ -706,6 +721,30 @@ a:hover { color: var(--color-primary-hover); }
 .diet-symbol.veg .diet-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; }
 .diet-symbol.non-veg { border: 1.5px solid #991b1b; }
 .diet-symbol.non-veg .diet-dot { width: 8px; height: 8px; border-radius: 50%; background: #991b1b; }
+.diet-symbol.mixed { border: 1.5px solid #d97706; }
+.diet-symbol.mixed .diet-dot { width: 8px; height: 8px; border-radius: 50%; background: #d97706; }
+
+.input-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  padding: 1px 8px;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 9999px;
+  transition: all var(--transition-fast);
+}
+.input-edit-btn:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+}
+
+
 
 /* ─── Skeleton ──────────────────────────────────────────── */
 @keyframes shimmer {
