@@ -131,80 +131,96 @@ export default function BlockedAccounts() {
 
       <main className="admin-main">
         {/* Header */}
-        <div className="admin-page-header">
+        <div className="admin-breadcrumb-bar">
           <div>
-            <div className="d-flex align-items-center gap-2 mb-1">
-              <h1 className="admin-page-title m-0">Blocked Accounts</h1>
-              <span
-                className="badge"
-                style={{
-                  background: 'var(--color-danger-bg)',
-                  color: 'var(--color-danger)',
-                  border: '1px solid var(--color-danger-border)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                }}
-              >
-                {stats?.totalBlocked ?? usersList.length} Blocked
-              </span>
-            </div>
-            <p className="admin-page-subtitle m-0">
-              One unified blocklist for donors and NGOs. Blocked accounts cannot log in, register again with their phone number, or display listings.
-            </p>
+            <h1 className="admin-page-title">Blocked Accounts</h1>
           </div>
         </div>
 
-        {/* Filter and Search Bar */}
-        <div className="admin-filter-bar mb-4">
-          <div className="search-box" style={{ flex: 1, minWidth: '240px' }}>
-            <Search size={16} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search by name, organization, phone, or admin note..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="admin-form-input"
-              style={{ width: '100%', paddingLeft: '36px' }}
-            />
-          </div>
-
-          <div className="d-flex align-items-center gap-2 flex-wrap">
-            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-              Account Type:
-            </span>
-            <div className="d-inline-flex gap-1 p-1 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+        {/* Panel Section */}
+        <section className="admin-card-panel">
+          {/* Top Filter Bar: All / Donors Only / NGOs Only */}
+          <div
+            className="d-flex justify-content-between align-items-center flex-wrap gap-3"
+            style={{
+              padding: 'var(--space-4) var(--space-5)',
+              borderBottom: '1px solid var(--color-border-subtle)',
+              background: 'var(--color-surface-2)',
+            }}
+          >
+            <div className="d-flex align-items-center gap-2 flex-wrap">
               <button
                 type="button"
-                className={`btn btn-sm ${typeFilter === 'all' ? 'btn-admin-primary' : 'btn-link text-decoration-none'}`}
-                style={{ fontSize: '12px', padding: '4px 10px', color: typeFilter === 'all' ? '#fff' : 'var(--color-text-secondary)' }}
+                className={`btn-admin-outline ${typeFilter === 'all' ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
                 onClick={() => setTypeFilter('all')}
               >
-                All Accounts
+                All Accounts ({stats?.totalBlocked ?? usersList.length})
               </button>
               <button
                 type="button"
-                className={`btn btn-sm ${typeFilter === 'donator' ? 'btn-admin-primary' : 'btn-link text-decoration-none'}`}
-                style={{ fontSize: '12px', padding: '4px 10px', color: typeFilter === 'donator' ? '#fff' : 'var(--color-text-secondary)' }}
+                className={`btn-admin-outline ${typeFilter === 'donator' ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
                 onClick={() => setTypeFilter('donator')}
               >
                 Donors Only
               </button>
               <button
                 type="button"
-                className={`btn btn-sm ${typeFilter === 'ngo' ? 'btn-admin-primary' : 'btn-link text-decoration-none'}`}
-                style={{ fontSize: '12px', padding: '4px 10px', color: typeFilter === 'ngo' ? '#fff' : 'var(--color-text-secondary)' }}
+                className={`btn-admin-outline ${typeFilter === 'ngo' ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
                 onClick={() => setTypeFilter('ngo')}
               >
                 NGOs Only
               </button>
             </div>
-          </div>
-        </div>
 
-        {/* Blocked Accounts Table Section */}
-        <section className="admin-card p-0" style={{ overflow: 'hidden' }}>
+            <span
+              className="badge"
+              style={{
+                background: 'var(--color-danger-bg)',
+                color: 'var(--color-danger)',
+                border: '1px solid var(--color-danger-border)',
+                fontWeight: 700,
+                fontSize: '12px',
+                padding: '4px 10px',
+                borderRadius: '12px',
+              }}
+            >
+              {stats?.totalBlocked ?? usersList.length} Blocked
+            </span>
+          </div>
+
+          {/* Search Bar matching other admin pages */}
+          <div
+            className="d-flex justify-content-between align-items-center flex-wrap gap-3"
+            style={{
+              padding: 'var(--space-4) var(--space-5)',
+              borderBottom: '1px solid var(--color-border-subtle)',
+            }}
+          >
+            <div className="d-flex align-items-center gap-3 flex-wrap">
+              <div style={{ position: 'relative', width: '340px', maxWidth: '100%' }}>
+                <Search
+                  size={16}
+                  color="var(--color-text-muted)"
+                  style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+                />
+                <input
+                  type="text"
+                  className="admin-form-input"
+                  style={{ paddingLeft: '2.4rem' }}
+                  placeholder="Search by name, organization, phone, note..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <span className="text-muted" style={{ fontSize: 'var(--text-small)', whiteSpace: 'nowrap' }}>
+              Showing <strong>{usersList.length}</strong> of {stats?.totalBlocked ?? usersList.length} blocked accounts
+            </span>
+          </div>
           {loading ? (
             <div className="p-5 text-center">
               <div className="spinner-border text-danger" role="status">

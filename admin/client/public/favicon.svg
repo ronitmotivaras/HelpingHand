@@ -1,16 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <defs>
-    <linearGradient id="hh-admin-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e293b" />
-      <stop offset="100%" stop-color="#0f172a" />
-    </linearGradient>
-    <linearGradient id="hh-green-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4ade80" />
-      <stop offset="100%" stop-color="#16a34a" />
-    </linearGradient>
-  </defs>
-  <rect width="48" height="48" rx="12" fill="url(#hh-admin-grad)" />
-  <path d="M24 10l12 4.5v9.5c0 7.5-5 14-12 16-7-2-12-8.5-12-16V14.5L24 10z" fill="url(#hh-green-grad)" />
-  <path d="M20 28c0-5 4-9 9-9h2v2c0 5-4 9-9 9h-2v-2z" fill="#ffffff" />
-  <path d="M22 26c3-1.5 5.5-4.5 6.5-8" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" fill="none" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#1a7a2e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    @media (prefers-color-scheme: dark) {
+      :root {
+        stroke: #22c55e;
+      }
+    }
+  </style>
+  <path d="M11 20a10 10 0 0 0 10-10 25.9 25.9 0 0 0-1.04-7.281 1 1 0 0 0-1.755-.325C15.833 5.5 13 5.5 9.8 6.1A7 7 0 0 0 11 20Z" />
+  <path d="M2 21a5 5 0 0 1 2.911-4.544C7.613 15.212 8.351 15.24 11 13" />
 </svg>

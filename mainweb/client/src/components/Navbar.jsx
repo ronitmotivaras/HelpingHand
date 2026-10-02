@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Leaf, UserCircle, Plus, BadgeCheck, Clock, Bell } from 'lucide-react';
+import { Leaf, UserCircle, BadgeCheck, Clock, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
 
@@ -73,17 +73,6 @@ export default function Navbar() {
         </Link>
 
         <div className="hh-nav-links d-flex align-items-center gap-2">
-          {!isNgo && (
-            <Link
-              to="/donate"
-              className="btn-hh-primary d-inline-flex align-items-center gap-1"
-              style={{ padding: '6px 14px', fontSize: 'var(--text-small)' }}
-            >
-              <Plus size={14} strokeWidth={2.5} />
-              <span>Donate</span>
-            </Link>
-          )}
-
           {user && (
             <Link
               to="/notifications"

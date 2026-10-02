@@ -18,10 +18,12 @@ import {
   X,
   ShieldAlert,
   Filter,
+  Pencil,
 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
+import { validateMobile, validatePassword } from '../utils/validation';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -56,6 +58,20 @@ export default function NgoVerification() {
   const [deleteModalItem, setDeleteModalItem] = useState(null); // { id, name, phone }
   const [blockPhoneChecked, setBlockPhoneChecked] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Edit NGO Modal State
+  const [editingNgo, setEditingNgo] = useState(null);
+  const [editForm, setEditForm] = useState({
+    ngoName: '',
+    coordinatorName: '',
+    mobile: '',
+    city: '',
+    address: '',
+    newPassword: '',
+  });
+  const [mobileError, setMobileError] = useState('');
+  const [passwordErrors, setPasswordErrors] = useState([]);
+  const [isSavingNgo, setIsSavingNgo] = useState(false);
 
   async function loadNgos() {
     setLoading(true);
@@ -125,6 +141,87 @@ export default function NgoVerification() {
       toast.error(err.response?.data?.message || 'Failed to update status');
     } finally {
       setProcessingId(null);
+    }
+  }
+
+  // Edit NGO Handlers
+  function openEditModal(ngo) {
+    setEditingNgo(ngo);
+    setEditForm({
+      ngoName: ngo.ngoDetails?.ngoName || ngo.ngoDetails?.name || ngo.name || '',
+      coordinatorName: ngo.ngoDetails?.coordinatorName || ngo.name || '',
+      mobile: ngo.ngoDetails?.contactNum || ngo.ngoDetails?.contactNumber || ngo.mobile || '',
+      city: ngo.ngoDetails?.city || ngo.city || '',
+      address: ngo.ngoDetails?.address || '',
+      newPassword: '',
+    });
+    setMobileError('');
+    setPasswordErrors([]);
+  }
+
+  function closeEditModal() {
+    setEditingNgo(null);
+    setEditForm({
+      ngoName: '',
+      coordinatorName: '',
+      mobile: '',
+      city: '',
+      address: '',
+      newPassword: '',
+    });
+    setMobileError('');
+    setPasswordErrors([]);
+  }
+
+  function handleEditMobileInput(val) {
+    setEditForm((prev) => ({ ...prev, mobile: val }));
+    if (/[^0-9]/.test(val)) {
+      setMobileError('Only digits (0-9) allowed. No characters, spaces, or symbols.');
+    } else if (val.length > 0 && val.length !== 10) {
+      setMobileError('Mobile number must be exactly 10 digits');
+    } else {
+      setMobileError('');
+    }
+  }
+
+  async function handleSaveEdit(e) {
+    e.preventDefault();
+    if (!editingNgo) return;
+
+    const mErr = validateMobile(editForm.mobile);
+    if (mErr) {
+      setMobileError(mErr);
+      return;
+    }
+
+    if (editForm.newPassword) {
+      const pErrors = validatePassword(editForm.newPassword);
+      if (pErrors.length > 0) {
+        setPasswordErrors(pErrors);
+        return;
+      }
+    }
+
+    setIsSavingNgo(true);
+    try {
+      await api.patch(`/api/admin/users/${editingNgo.id}`, {
+        ngoName: editForm.ngoName.trim(),
+        name: editForm.ngoName.trim(),
+        coordinatorName: editForm.coordinatorName.trim(),
+        mobile: editForm.mobile.trim(),
+        coordinatorPhone: editForm.mobile.trim(),
+        city: editForm.city.trim(),
+        address: editForm.address.trim(),
+        newPassword: editForm.newPassword || undefined,
+      });
+      toast.success(`NGO details updated for "${editForm.ngoName}"`);
+      closeEditModal();
+      await loadNgos();
+    } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
+      toast.error(err.response?.data?.message || 'Failed to update NGO details');
+    } finally {
+      setIsSavingNgo(false);
     }
   }
 
@@ -250,14 +347,7 @@ export default function NgoVerification() {
               <button
                 type="button"
                 className={`btn-admin-outline ${statusFilter === 'all' && !onlyWithNotes ? 'active' : ''}`}
-                style={{
-                  padding: '6px 14px',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 600,
-                  backgroundColor: statusFilter === 'all' && !onlyWithNotes ? 'var(--color-primary)' : 'transparent',
-                  color: statusFilter === 'all' && !onlyWithNotes ? '#ffffff' : 'inherit',
-                  borderColor: statusFilter === 'all' && !onlyWithNotes ? 'var(--color-primary)' : 'var(--color-border)',
-                }}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
                 onClick={() => {
                   setStatusFilter('all');
                   setOnlyWithNotes(false);
@@ -269,14 +359,7 @@ export default function NgoVerification() {
               <button
                 type="button"
                 className={`btn-admin-outline ${statusFilter === 'pending' && !onlyWithNotes ? 'active' : ''}`}
-                style={{
-                  padding: '6px 14px',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 600,
-                  backgroundColor: statusFilter === 'pending' && !onlyWithNotes ? '#f59e0b' : 'transparent',
-                  color: statusFilter === 'pending' && !onlyWithNotes ? '#ffffff' : 'inherit',
-                  borderColor: statusFilter === 'pending' && !onlyWithNotes ? '#f59e0b' : 'var(--color-border)',
-                }}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
                 onClick={() => {
                   setStatusFilter('pending');
                   setOnlyWithNotes(false);
@@ -288,14 +371,7 @@ export default function NgoVerification() {
               <button
                 type="button"
                 className={`btn-admin-outline ${statusFilter === 'approved' && !onlyWithNotes ? 'active' : ''}`}
-                style={{
-                  padding: '6px 14px',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 600,
-                  backgroundColor: statusFilter === 'approved' && !onlyWithNotes ? '#15803d' : 'transparent',
-                  color: statusFilter === 'approved' && !onlyWithNotes ? '#ffffff' : 'inherit',
-                  borderColor: statusFilter === 'approved' && !onlyWithNotes ? '#15803d' : 'var(--color-border)',
-                }}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
                 onClick={() => {
                   setStatusFilter('approved');
                   setOnlyWithNotes(false);
@@ -307,14 +383,7 @@ export default function NgoVerification() {
               <button
                 type="button"
                 className={`btn-admin-outline ${statusFilter === 'rejected' && !onlyWithNotes ? 'active' : ''}`}
-                style={{
-                  padding: '6px 14px',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 600,
-                  backgroundColor: statusFilter === 'rejected' && !onlyWithNotes ? '#64748b' : 'transparent',
-                  color: statusFilter === 'rejected' && !onlyWithNotes ? '#ffffff' : 'inherit',
-                  borderColor: statusFilter === 'rejected' && !onlyWithNotes ? '#64748b' : 'var(--color-border)',
-                }}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
                 onClick={() => {
                   setStatusFilter('rejected');
                   setOnlyWithNotes(false);
@@ -327,14 +396,7 @@ export default function NgoVerification() {
               <button
                 type="button"
                 className={`btn-admin-outline ${onlyWithNotes ? 'active' : ''}`}
-                style={{
-                  padding: '6px 14px',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 600,
-                  backgroundColor: onlyWithNotes ? '#3b82f6' : 'transparent',
-                  color: onlyWithNotes ? '#ffffff' : '#2563eb',
-                  borderColor: onlyWithNotes ? '#3b82f6' : '#bfdbfe',
-                }}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
                 onClick={() => {
                   setOnlyWithNotes(!onlyWithNotes);
                 }}
@@ -532,6 +594,39 @@ export default function NgoVerification() {
                           </button>
                         )}
 
+                        {/* Move to Pending button for Verified NGO */}
+                        {isApproved && (
+                          <button
+                            type="button"
+                            className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                            style={{
+                              padding: '6px 13px',
+                              fontSize: 'var(--text-sm)',
+                              color: '#d97706',
+                              borderColor: '#fde68a',
+                            }}
+                            disabled={isProcessing}
+                            onClick={() => handleSetPending(ngo.id, ngoName)}
+                            title="Move verified NGO back to Pending"
+                          >
+                            <RotateCcw size={14} />
+                            <span>Move to Pending</span>
+                          </button>
+                        )}
+
+                        {/* Edit NGO button */}
+                        <button
+                          type="button"
+                          className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                          style={{ padding: '6px 13px', fontSize: 'var(--text-sm)' }}
+                          disabled={isProcessing}
+                          onClick={() => openEditModal(ngo)}
+                          title="Edit NGO details (Name, Coordinator, Phone, Address, City)"
+                        >
+                          <Pencil size={14} />
+                          <span>Edit</span>
+                        </button>
+
                         {/* 2. Add Note button (Keep Pending & Add Note) */}
                         <button
                           type="button"
@@ -553,7 +648,7 @@ export default function NgoVerification() {
                           <span>{adminNotes.length > 0 ? `Notes (${adminNotes.length})` : 'Add Note'}</span>
                         </button>
 
-                        {/* 3. Decline button (Reversible, normal donor features remain) */}
+                        {/* 3. Decline button (Declines and blocks fake NGO) */}
                         {!isRejected && (
                           <button
                             type="button"
@@ -566,7 +661,7 @@ export default function NgoVerification() {
                             }}
                             disabled={isProcessing}
                             onClick={() => setDeclineModalItem({ id: ngo.id, name: ngoName })}
-                            title="Case 3: Doubtful, not proven fake. Decline NGO application (reversible)"
+                            title="Decline fake NGO and block phone number"
                           >
                             <XCircle size={15} />
                             <span>Decline</span>
@@ -588,7 +683,7 @@ export default function NgoVerification() {
                           </button>
                         )}
 
-                        {/* 4. Delete button (Confirmed fraud / fake, with option to block phone) */}
+                        {/* 4. Delete button (Permanently removes NGO completely with no user account left behind) */}
                         <button
                           type="button"
                           className="btn-admin-danger d-inline-flex align-items-center gap-1"
@@ -598,7 +693,7 @@ export default function NgoVerification() {
                             setDeleteModalItem({ id: ngo.id, name: ngoName, phone: contactNum });
                             setBlockPhoneChecked(true);
                           }}
-                          title="Case A: Confirmed fraud or fake. Permanently delete and optionally block phone"
+                          title="Permanently remove NGO completely"
                         >
                           <Trash2 size={15} />
                           <span>Delete</span>
@@ -938,6 +1033,166 @@ export default function NgoVerification() {
                   {isDeleting ? 'Deleting...' : blockPhoneChecked ? 'Delete & Block Number' : 'Delete NGO'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* Modal 4: Edit NGO Modal */}
+        {editingNgo && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1050,
+              padding: '16px',
+            }}
+            onClick={closeEditModal}
+          >
+            <div
+              style={{
+                maxWidth: '520px',
+                width: '100%',
+                background: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-xl)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '28px',
+                border: '1px solid var(--color-border)',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                  Edit NGO Details
+                </h3>
+                <button
+                  type="button"
+                  className="btn-link text-muted border-0 bg-transparent p-0 cursor-pointer"
+                  onClick={closeEditModal}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEdit}>
+                <div className="mb-3">
+                  <label className="form-label fw-semibold" style={{ fontSize: '13px' }}>
+                    Organization Name
+                  </label>
+                  <input
+                    type="text"
+                    className="admin-form-input w-100"
+                    value={editForm.ngoName}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, ngoName: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold" style={{ fontSize: '13px' }}>
+                    Coordinator Name
+                  </label>
+                  <input
+                    type="text"
+                    className="admin-form-input w-100"
+                    value={editForm.coordinatorName}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, coordinatorName: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold" style={{ fontSize: '13px' }}>
+                    Contact Phone (10 digits)
+                  </label>
+                  <input
+                    type="text"
+                    className="admin-form-input w-100"
+                    value={editForm.mobile}
+                    onChange={(e) => handleEditMobileInput(e.target.value)}
+                    required
+                  />
+                  {mobileError && (
+                    <div className="text-danger small mt-1">{mobileError}</div>
+                  )}
+                </div>
+
+                <div className="row g-2 mb-3">
+                  <div className="col-sm-6">
+                    <label className="form-label fw-semibold" style={{ fontSize: '13px' }}>
+                      City
+                    </label>
+                    <select
+                      className="admin-form-input w-100"
+                      value={editForm.city}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, city: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select City...</option>
+                      {CITIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-sm-6">
+                    <label className="form-label fw-semibold" style={{ fontSize: '13px' }}>
+                      Reset Password (Optional)
+                    </label>
+                    <input
+                      type="password"
+                      className="admin-form-input w-100"
+                      placeholder="Leave blank to keep"
+                      value={editForm.newPassword}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {passwordErrors.length > 0 && (
+                  <div className="alert alert-danger p-2 mb-3" style={{ fontSize: '12px' }}>
+                    {passwordErrors.map((err, idx) => (
+                      <div key={idx}>{err}</div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <label className="form-label fw-semibold" style={{ fontSize: '13px' }}>
+                    Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    className="admin-form-input w-100"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, address: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="d-flex justify-content-end gap-2">
+                  <button
+                    type="button"
+                    className="btn-admin-outline"
+                    onClick={closeEditModal}
+                    disabled={isSavingNgo}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-admin-primary"
+                    disabled={isSavingNgo}
+                  >
+                    {isSavingNgo ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

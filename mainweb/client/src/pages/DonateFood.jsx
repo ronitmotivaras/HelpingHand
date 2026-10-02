@@ -30,7 +30,14 @@ export default function DonateFood() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const minNow = useMemo(() => getLocalDateTimeString(), []);
+  const [currentMinTime, setCurrentMinTime] = useState(() => getLocalDateTimeString());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentMinTime(getLocalDateTimeString());
+    }, 15000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Form state
   const [items, setItems] = useState([
@@ -102,6 +109,7 @@ export default function DonateFood() {
     const parts = Object.entries(map).map(([u, sum]) => `${sum} ${u}`);
     return {
       count,
+      quantityText: parts.join(' + ') || '0',
       text: count > 0 ? `${count} item${count > 1 ? 's' : ''}: ${parts.join(' + ') || 'valid'}` : '',
     };
   }, [items]);
@@ -154,9 +162,9 @@ export default function DonateFood() {
     const toDate = new Date(form.pickupTo);
     const expDate = new Date(form.expiryAt);
 
-    // Rule: pickupFrom not in the past
-    if (fromDate.getTime() < Date.now() - 60000) {
-      toast.error('Pickup start time cannot be in the past');
+    // Rule: pickupFrom not in the past (minimum current time)
+    if (fromDate.getTime() < Date.now() - 30000) {
+      toast.error('Pickup start time cannot be in the past. Current time is the minimum.');
       return;
     }
 
@@ -380,7 +388,8 @@ export default function DonateFood() {
                   <input
                     id="pickup-from"
                     type="datetime-local"
-                    min={minNow}
+                    min={currentMinTime}
+                    onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
                     value={form.pickupFrom}
                     onChange={(e) => updateForm('pickupFrom', e.target.value)}
@@ -398,7 +407,8 @@ export default function DonateFood() {
                   <input
                     id="pickup-to"
                     type="datetime-local"
-                    min={form.pickupFrom || minNow}
+                    min={form.pickupFrom || currentMinTime}
+                    onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
                     value={form.pickupTo}
                     onChange={(e) => updateForm('pickupTo', e.target.value)}
@@ -416,7 +426,8 @@ export default function DonateFood() {
                   <input
                     id="expiry-at"
                     type="datetime-local"
-                    min={form.pickupFrom || minNow}
+                    min={form.pickupFrom || currentMinTime}
+                    onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
                     value={form.expiryAt}
                     onChange={(e) => updateForm('expiryAt', e.target.value)}
@@ -461,6 +472,37 @@ export default function DonateFood() {
                 required
               />
             </div>
+
+            {/* End Summary: Total item count and total quantity */}
+            {summary.count > 0 && (
+              <div
+                className="p-3 mb-4 rounded d-flex justify-content-between align-items-center flex-wrap gap-2"
+                style={{
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <div className="d-flex align-items-center gap-2">
+                  <Package size={20} color="var(--color-primary)" />
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                      Total Food Items:
+                    </div>
+                    <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--color-text)' }}>
+                      {summary.count} {summary.count === 1 ? 'item' : 'items'}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-end">
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                    Total Quantity:
+                  </div>
+                  <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--color-primary)' }}>
+                    {summary.quantityText}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="pt-2">
               <button

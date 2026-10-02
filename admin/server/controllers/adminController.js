@@ -385,7 +385,16 @@ async function updateUser(req, res) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { name, mobile, city, newPassword } = req.body;
+    const {
+      name,
+      mobile,
+      city,
+      newPassword,
+      ngoName,
+      coordinatorName,
+      address,
+      coordinatorPhone,
+    } = req.body;
 
     if (name && String(name).trim()) {
       user.name = String(name).trim();
@@ -393,6 +402,28 @@ async function updateUser(req, res) {
 
     if (city && String(city).trim()) {
       user.city = String(city).trim();
+      if (user.ngoDetails) {
+        user.ngoDetails.city = String(city).trim();
+      }
+    }
+
+    if (user.ngoDetails) {
+      if (ngoName && String(ngoName).trim()) {
+        user.ngoDetails.ngoName = String(ngoName).trim();
+        user.name = String(ngoName).trim();
+      }
+      if (coordinatorName && String(coordinatorName).trim()) {
+        user.ngoDetails.coordinatorName = String(coordinatorName).trim();
+      }
+      if (address && String(address).trim()) {
+        user.ngoDetails.address = String(address).trim();
+      }
+      if (coordinatorPhone && String(coordinatorPhone).trim()) {
+        const cleanCoord = String(coordinatorPhone).trim();
+        if (/^\d{10}$/.test(cleanCoord)) {
+          user.ngoDetails.coordinatorPhone = cleanCoord;
+        }
+      }
     }
 
     if (mobile) {
