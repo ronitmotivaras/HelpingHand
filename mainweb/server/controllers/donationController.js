@@ -740,6 +740,36 @@ async function getNgoProfileForDonor(req, res) {
   }
 }
 
+// Backwards compatibility function
+async function bookFood(req, res) {
+  try {
+    const donation = await FoodDonation.findById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ message: 'Listing not found' });
+    }
+    if (String(donation.donorId) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'Only the donor can manage this listing' });
+    }
+    if (donation.status !== 'available') {
+      return res.status(400).json({ message: 'Only available listings can be accepted' });
+    }
+
+    const ngoName = (req.body.ngoName || req.body.note || '').trim();
+    donation.status = 'accepted';
+    donation.bookedByNgoName = ngoName;
+    donation.acceptedNgo = {
+      ngoName,
+      acceptedAt: new Date(),
+    };
+    donation.bookedAt = new Date();
+    await donation.save();
+
+    return res.json(publicDonation(donation, req.user));
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to update listing' });
+  }
+}
+
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -753,6 +783,7 @@ module.exports = {
   cancelPickupRequest,
   acceptRequest,
   declineRequest,
+  bookFood,
   releaseFood,
   markPickedUp,
   getNgoProfileForDonor,
