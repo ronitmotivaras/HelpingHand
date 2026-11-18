@@ -1,0 +1,36 @@
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+
+async function authMiddleware(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const payload = jwt.verify(token, process.env.USER_JWT_SECRET);
+    if (payload.type !== 'user' || !payload.id) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    const user = await User.findById(payload.id);
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({
+        message: 'Your account has been blocked by admin. Please contact support.',
+        isBlocked: true,
+      });
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid or expired token' });
+  }
+}
+
+module.exports = authMiddleware;
