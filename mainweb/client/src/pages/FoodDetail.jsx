@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   XCircle,
   Send,
-  RotateCcw,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';

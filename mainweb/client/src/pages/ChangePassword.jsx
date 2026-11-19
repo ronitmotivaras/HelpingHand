@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import api from '../api/axiosInstance';
 import { validatePassword } from '../utils/validation';

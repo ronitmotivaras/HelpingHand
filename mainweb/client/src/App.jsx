@@ -12,7 +12,7 @@ import ChangePassword from './pages/ChangePassword';
 import Notifications from './pages/Notifications';
 import MyDonatedFood from './pages/MyDonatedFood';
 import { useAuth } from './context/AuthContext';
-import './App.css';
+import './styles/app.css';
 
 function RoleBasedHome() {
   const { user } = useAuth();

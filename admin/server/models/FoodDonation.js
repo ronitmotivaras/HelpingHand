@@ -32,15 +32,20 @@ const foodDonationSchema = new mongoose.Schema({
   donorName: { type: String, required: true, trim: true },
   donorPhone: { type: String, required: true, trim: true },
 
+  // Multiple items
   items: { type: [foodItemSchema], default: [] },
+
+  // Backward compatibility fields
   foodName: { type: String, trim: true, default: '' },
   quantity: { type: String, trim: true, default: '' },
+
   foodType: { type: String, enum: ['veg', 'nonveg', 'mixed'], required: true },
 
+  // Timing fields
   pickupFrom: { type: Date },
   pickupTo: { type: Date },
   expiryAt: { type: Date },
-  availableUpto: { type: Date },
+  availableUpto: { type: Date }, // Kept for backwards compatibility
 
   address: { type: String, required: true, trim: true },
   city: { type: String, required: true, trim: true },
@@ -51,8 +56,10 @@ const foodDonationSchema = new mongoose.Schema({
     default: 'available',
   },
 
+  // Pickup requests from NGOs
   requests: { type: [donationRequestSchema], default: [] },
 
+  // Stored details of accepted NGO
   acceptedNgo: {
     ngoId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     ngoName: { type: String, default: '' },

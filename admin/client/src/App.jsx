@@ -7,7 +7,7 @@ import NgoVerification from './pages/NgoVerification';
 import UserAccounts from './pages/UserAccounts';
 import BlockedAccounts from './pages/BlockedAccounts';
 import ChangePassword from './pages/ChangePassword';
-import './admin.css';
+import './styles/admin.css';
 
 export default function App() {
   return (

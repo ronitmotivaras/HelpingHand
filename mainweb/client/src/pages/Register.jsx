@@ -15,7 +15,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { validatePassword, validateMobile, validateName, validateNgoName, validateAddress } from '../utils/validation';
+import { validatePassword, validateMobile } from '../utils/validation';
 import { CITIES } from '../constants/cities';
 
 export default function Register() {

@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
-import { validateMobile, validateName, validateAddress } from '../utils/validation';
+import { validateMobile } from '../utils/validation';
 
 function getLocalDateTimeString(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');

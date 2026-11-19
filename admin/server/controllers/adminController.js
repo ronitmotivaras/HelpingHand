@@ -485,6 +485,20 @@ async function deleteUser(req, res) {
       { $pull: { requests: { ngoId: user._id } } }
     );
 
+    // If an NGO is deleted and was accepted on an active listing, reset that listing to available
+    await FoodDonation.updateMany(
+      { 'acceptedNgo.ngoId': user._id, status: 'accepted' },
+      {
+        $set: {
+          status: 'available',
+          acceptedNgo: null,
+          bookedByNgoName: '',
+          bookedByNgoPhone: '',
+          bookedAt: null,
+        },
+      }
+    );
+
     await user.deleteOne();
     return res.json({ message: 'User and all associated data permanently deleted' });
   } catch (err) {

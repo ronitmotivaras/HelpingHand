@@ -3,7 +3,6 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Leaf, Phone, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { validateMobile } from '../utils/validation';
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();

@@ -25,7 +25,7 @@ const notificationSchema = new mongoose.Schema(
     relatedFoodId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodDonation' },
     relatedRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'Request' },
     isRead: { type: Boolean, default: false, index: true },
-    createdAt: { type: Date, default: Date.now, expires: 30 * 24 * 60 * 60 },
+    createdAt: { type: Date, default: Date.now, expires: 30 * 24 * 60 * 60 }, // 30 days TTL auto-delete
   }
 );
 

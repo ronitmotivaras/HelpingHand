@@ -1,15 +1,3 @@
-export function validateName() {
-  return '';
-}
-
-export function validateNgoName() {
-  return '';
-}
-
-export function validateAddress() {
-  return '';
-}
-
 export function validatePassword(password) {
   const errors = [];
   if (!password || password.length < 6) {

@@ -11,7 +11,6 @@ import {
   X,
   User,
   Phone,
-  Calendar,
   ShieldAlert,
   ChevronDown,
 } from 'lucide-react';

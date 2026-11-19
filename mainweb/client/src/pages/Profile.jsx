@@ -3,8 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft,
-  BadgeCheck,
-  Clock,
   UserCircle,
   Building2,
   User,
@@ -18,12 +16,11 @@ import {
   Shield,
   Check,
   X,
-  Compass,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
-import { validateMobile, validateName, validateNgoName, validateAddress } from '../utils/validation';
+import { validateMobile } from '../utils/validation';
 import { CITIES } from '../constants/cities';
 
 export default function Profile() {

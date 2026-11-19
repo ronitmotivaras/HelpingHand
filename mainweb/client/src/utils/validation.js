@@ -1,15 +1,3 @@
-export function validateName() {
-  return '';
-}
-
-export function validateNgoName() {
-  return '';
-}
-
-export function validateAddress() {
-  return '';
-}
-
 export function validatePassword(password) {
   const errors = [];
   if (!password || password.length < 6) {
@@ -38,13 +26,5 @@ export function validateMobile(mobile) {
   if (str.length !== 10) {
     return 'Mobile number must be exactly 10 digits';
   }
-  return '';
-}
-
-export function validateFoodItemName() {
-  return '';
-}
-
-export function validateQuantity() {
   return '';
 }

@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const seedAdmin = require('./scripts/seedAdmin');
 const adminRoutes = require('./routes/admin');
@@ -10,8 +11,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-const mongoose = require('mongoose');
 
 app.get(['/api/admin/health', '/api/health', '/health'], (req, res) => {
   const isDbConnected = mongoose.connection.readyState === 1;
