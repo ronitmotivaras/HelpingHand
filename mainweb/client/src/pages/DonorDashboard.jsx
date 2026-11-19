@@ -66,7 +66,6 @@ function isExpiringSoon(expiryDateStr) {
 export default function DonorDashboard() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed' | 'expired' | 'all'
   const [processingId, setProcessingId] = useState(null);
   const [selectedNgo, setSelectedNgo] = useState(null);
   const [loadingNgoProfile, setLoadingNgoProfile] = useState(false);
@@ -106,27 +105,10 @@ export default function DonorDashboard() {
     loadListings();
   }, []);
 
-  // Stats calculation
-  const totalCount = listings.length;
-  const pickedUpCount = listings.filter((l) => l.status === 'pickedUp').length;
-  const expiredCount = listings.filter((l) => isListingExpired(l)).length;
-  const activeCount = listings.filter(
-    (l) => !isListingExpired(l) && (l.status === 'available' || l.status === 'accepted' || l.status === 'booked')
-  ).length;
-
-  // Filter listings by tab
-  const filteredListings = listings.filter((l) => {
+  // Show only active food listings on the donor dashboard
+  const activeListings = listings.filter((l) => {
     const expired = isListingExpired(l);
-    if (activeTab === 'active') {
-      return !expired && (l.status === 'available' || l.status === 'accepted' || l.status === 'booked');
-    }
-    if (activeTab === 'completed') {
-      return l.status === 'pickedUp';
-    }
-    if (activeTab === 'expired') {
-      return expired;
-    }
-    return true;
+    return !expired && (l.status === 'available' || l.status === 'accepted' || l.status === 'booked');
   });
 
   // Action: Accept an NGO request
@@ -192,97 +174,12 @@ export default function DonorDashboard() {
         {/* Header with Title and "Donate Food" button */}
         <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
           <div>
-            <h1 className="display-title mb-1">Donor Dashboard</h1>
-            <p className="food-card-meta mb-0" style={{ fontSize: 'var(--text-base)' }}>
-              Manage your food donations, coordinate with verified NGOs, and track pickups.
-            </p>
+            <h1 className="display-title mb-0">Donor Dashboard</h1>
           </div>
           <Link to="/donate" className="btn-hh-primary d-inline-flex align-items-center gap-2">
             <Plus size={18} strokeWidth={2.5} />
             <span>Donate Food</span>
           </Link>
-        </div>
-
-        {/* 4 Stat Cards */}
-        <div className="row g-3 mb-4">
-          <div className="col-6 col-md-3">
-            <div className="donor-stat-card">
-              <div className="donor-stat-icon total">
-                <Package size={22} />
-              </div>
-              <div>
-                <div className="donor-stat-value">{totalCount}</div>
-                <div className="donor-stat-label">Total Donations</div>
-              </div>
-            </div>
-          </div>
-          <div className="col-6 col-md-3">
-            <div className="donor-stat-card">
-              <div className="donor-stat-icon active">
-                <Clock size={22} />
-              </div>
-              <div>
-                <div className="donor-stat-value">{activeCount}</div>
-                <div className="donor-stat-label">Active Listings</div>
-              </div>
-            </div>
-          </div>
-          <div className="col-6 col-md-3">
-            <div className="donor-stat-card">
-              <div className="donor-stat-icon completed">
-                <CheckCircle2 size={22} />
-              </div>
-              <div>
-                <div className="donor-stat-value">{pickedUpCount}</div>
-                <div className="donor-stat-label">Picked Up</div>
-              </div>
-            </div>
-          </div>
-          <div className="col-6 col-md-3">
-            <div className="donor-stat-card">
-              <div className="donor-stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
-                <AlertCircle size={22} />
-              </div>
-              <div>
-                <div className="donor-stat-value">{expiredCount}</div>
-                <div className="donor-stat-label">Expired Food</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs: Active / Completed / Expired / All */}
-        <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-          <div className="donor-nav-tabs">
-            <button
-              className={`donor-nav-tab ${activeTab === 'active' ? 'active' : ''}`}
-              onClick={() => setActiveTab('active')}
-            >
-              <span>Active</span>
-              <span className="donor-tab-count">{activeCount}</span>
-            </button>
-            <button
-              className={`donor-nav-tab ${activeTab === 'completed' ? 'active' : ''}`}
-              onClick={() => setActiveTab('completed')}
-            >
-              <span>Completed</span>
-              <span className="donor-tab-count">{pickedUpCount}</span>
-            </button>
-            <button
-              className={`donor-nav-tab ${activeTab === 'expired' ? 'active' : ''}`}
-              onClick={() => setActiveTab('expired')}
-            >
-              <span>Expired</span>
-              <span className="donor-tab-count">{expiredCount}</span>
-            </button>
-            <button
-              className={`donor-nav-tab ${activeTab === 'all' ? 'active' : ''}`}
-              onClick={() => setActiveTab('all')}
-            >
-              <span>All Listings</span>
-              <span className="donor-tab-count">{totalCount}</span>
-            </button>
-          </div>
         </div>
 
         {/* Loading skeleton */}
@@ -299,40 +196,19 @@ export default function DonorDashboard() {
         )}
 
         {/* Empty state */}
-        {!loading && filteredListings.length === 0 && (
+        {!loading && activeListings.length === 0 && (
           <div className="empty-state text-center py-5">
             <div className="mb-3">
               <Inbox size={56} color="var(--color-text-muted)" strokeWidth={1.5} />
             </div>
-            <h3 className="section-title mb-2">
-              {activeTab === 'active'
-                ? 'No active donations right now'
-                : activeTab === 'completed'
-                ? 'No completed pickups yet'
-                : activeTab === 'expired'
-                ? 'No expired food donations'
-                : 'No donations posted yet'}
-            </h3>
-            <p className="empty-state-text mb-4">
-              {activeTab === 'active'
-                ? 'Have surplus food to share? Create a new listing and connect with local NGOs.'
-                : activeTab === 'completed'
-                ? 'When NGOs pick up your food, they will appear in your Completed history.'
-                : activeTab === 'expired'
-                ? 'Listings whose pickup window or consume-by time has passed move here automatically.'
-                : 'Start donating food to help those in need.'}
-            </p>
-            <Link to="/donate" className="btn-hh-secondary d-inline-flex align-items-center gap-2">
-              <Plus size={16} />
-              <span>Post a Food Donation</span>
-            </Link>
+            <h3 className="section-title mb-0">No active donations right now</h3>
           </div>
         )}
 
-        {/* Listings Cards */}
-        {!loading && filteredListings.length > 0 && (
+        {/* Listings Cards - Active Food Only */}
+        {!loading && activeListings.length > 0 && (
           <div className="d-flex flex-column gap-4">
-            {filteredListings.map((listing) => {
+            {activeListings.map((listing) => {
               const isNonVeg = listing.foodType === 'nonveg';
               const isMixed = listing.foodType === 'mixed';
               const dietClass = isNonVeg ? 'non-veg' : isMixed ? 'mixed' : 'veg';

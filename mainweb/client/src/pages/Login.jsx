@@ -9,7 +9,7 @@ export default function Login() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [mobile, setMobile] = useState(location.state?.mobile || '');
+  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -25,13 +25,10 @@ export default function Login() {
   }
 
   function handleMobileChange(val) {
-    setMobile(val);
+    const clean = val.replace(/\D/g, '').slice(0, 10);
+    setMobile(clean);
     setBlockedWarning('');
-    if (/[^0-9]/.test(val)) {
-      setFieldErrors((prev) => ({ ...prev, mobile: 'Only numbers (0-9) are allowed. No characters, symbols, or spaces.' }));
-    } else if (val.length > 0 && val.length !== 10) {
-      setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number must be exactly 10 digits' }));
-    } else {
+    if (fieldErrors.mobile) {
       setFieldErrors((prev) => ({ ...prev, mobile: '' }));
     }
   }
@@ -135,15 +132,17 @@ export default function Login() {
               </div>
               <input
                 id="login-mobile"
+                type="tel"
                 className="form-control"
                 style={{
                   paddingLeft: '2.4rem',
                   borderColor: fieldErrors.mobile ? 'var(--color-danger)' : undefined,
                 }}
-                placeholder="e.g. 9876543210"
+                placeholder="Enter mobile number (10 digit)"
                 value={mobile}
                 onChange={(e) => handleMobileChange(e.target.value)}
-                autoFocus={!location.state?.mobile}
+                maxLength={10}
+                autoFocus
               />
             </div>
             {fieldErrors.mobile && (
@@ -178,11 +177,10 @@ export default function Login() {
                   paddingRight: '2.8rem',
                   borderColor: fieldErrors.password ? 'var(--color-danger)' : undefined,
                 }}
-                placeholder="Enter your password"
+                placeholder="Enter password"
                 value={password}
                 onChange={(e) => handlePasswordChange(e.target.value)}
                 onPaste={(e) => e.preventDefault()}
-                autoFocus={Boolean(location.state?.mobile)}
               />
               <button
                 type="button"

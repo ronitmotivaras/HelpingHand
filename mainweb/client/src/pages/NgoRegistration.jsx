@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
-import { validateMobile } from '../utils/validation';
+import { validateMobile, validateName, validateAddress } from '../utils/validation';
 
 export default function NgoRegistration() {
   const { user, refreshProfile } = useAuth();
@@ -56,18 +56,25 @@ export default function NgoRegistration() {
   }
 
   function handlePhoneChange(val) {
-    update('contactNum', val);
-    if (/[^0-9]/.test(val)) {
-      setPhoneError('Only numbers (0-9) are allowed. No characters, symbols, or spaces.');
-    } else if (val.length > 0 && val.length !== 10) {
-      setPhoneError('Mobile number must be exactly 10 digits');
-    } else {
-      setPhoneError('');
-    }
+    const clean = val.replace(/\D/g, '').slice(0, 10);
+    update('contactNum', clean);
+    if (phoneError) setPhoneError('');
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
+
+    const nameErr = validateName(form.ngoName, 'Organization Name');
+    if (nameErr) {
+      toast.error(nameErr);
+      return;
+    }
+
+    const addrErr = validateAddress(form.address);
+    if (addrErr) {
+      toast.error(addrErr);
+      return;
+    }
 
     const mError = validateMobile(form.contactNum);
     if (mError) {
@@ -123,7 +130,7 @@ export default function NgoRegistration() {
               <input
                 id="ngo-name"
                 className="form-control"
-                placeholder="e.g. Robin Hood Army, Annamrita Foundation"
+                placeholder="Enter NGO name"
                 value={form.ngoName}
                 onChange={(e) => update('ngoName', e.target.value)}
                 required
@@ -136,7 +143,7 @@ export default function NgoRegistration() {
                 id="ngo-address"
                 className="form-control"
                 rows="3"
-                placeholder="Address of your community center or kitchen..."
+                placeholder="Enter address"
                 value={form.address}
                 onChange={(e) => update('address', e.target.value)}
                 required
@@ -167,9 +174,10 @@ export default function NgoRegistration() {
                 <input
                   id="ngo-contact"
                   className="form-control"
-                  placeholder="10-digit mobile number"
+                  placeholder="Enter mobile number (10 digit)"
                   value={form.contactNum}
                   onChange={(e) => handlePhoneChange(e.target.value)}
+                  maxLength={10}
                   required
                 />
                 {phoneError && (

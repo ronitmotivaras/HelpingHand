@@ -1,32 +1,62 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Plus, CheckCircle2, Clock, Inbox, Package } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Inbox,
+  Package,
+  AlertCircle,
+  MapPin,
+  Building2,
+  Calendar,
+} from 'lucide-react';
 import Navbar from '../components/Navbar';
 import api from '../api/axiosInstance';
 
-function getBadgeClass(status) {
-  if (status === 'accepted') return 'badge-status accepted';
-  if (status === 'available') return 'badge-status available';
-  return 'badge-status picked_up';
+function isListingExpired(l) {
+  if (!l) return false;
+  if (l.status === 'expired') return true;
+  if (l.status === 'pickedUp' || l.status === 'picked_up') return false;
+  if (l.expiryAt && new Date(l.expiryAt).getTime() <= Date.now()) return true;
+  if (l.pickupTo && new Date(l.pickupTo).getTime() <= Date.now()) return true;
+  if (l.availableUpto && new Date(l.availableUpto).getTime() <= Date.now()) return true;
+  return false;
 }
 
-function statusLabel(status) {
-  if (status === 'accepted') return 'Accepted';
-  if (status === 'available') return 'Available';
-  if (status === 'picked_up') return 'Picked Up';
-  if (status === 'expired') return 'Expired';
-  return status;
+function getStatusBadge(status, expired = false) {
+  if (status === 'pickedUp' || status === 'picked_up') {
+    return <span className="badge-status pickedUp">Picked Up</span>;
+  }
+  if (status === 'expired' || expired) {
+    return <span className="badge-status expired">Expired</span>;
+  }
+  if (status === 'accepted' || status === 'booked') {
+    return <span className="badge-status accepted">Accepted</span>;
+  }
+  return <span className="badge-status available">Available</span>;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function MyDonatedFood() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState(null);
+  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'pickedUp' | 'expired' | 'active'
 
   async function load() {
     try {
-      const { data } = await api.get('/donations/my-history');
+      const { data } = await api.get('/food/mine');
       setItems(data);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to load donation history');
@@ -39,116 +69,161 @@ export default function MyDonatedFood() {
     load();
   }, []);
 
-  async function markAccepted(id) {
-    setUpdatingId(id);
-    try {
-      await api.patch(`/donations/${id}/accept`);
-      toast.success('Listing status updated: Accepted for pickup');
-      await load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update status');
-    } finally {
-      setUpdatingId(null);
-    }
-  }
+  // Stats calculation
+  const totalCount = items.length;
+  const pickedUpCount = items.filter((l) => l.status === 'pickedUp' || l.status === 'picked_up').length;
+  const expiredCount = items.filter((l) => isListingExpired(l)).length;
 
-  async function markPickedUp(id) {
-    setUpdatingId(id);
-    try {
-      await api.patch(`/donations/${id}/picked-up`);
-      toast.success('Listing marked as completed (Picked Up)');
-      await load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to mark as picked up');
-    } finally {
-      setUpdatingId(null);
+  // Filter items by selected tab
+  const filteredItems = items.filter((item) => {
+    const expired = isListingExpired(item);
+    if (filterTab === 'pickedUp') {
+      return item.status === 'pickedUp' || item.status === 'picked_up';
     }
-  }
+    if (filterTab === 'expired') {
+      return expired;
+    }
+    return true;
+  });
 
   return (
     <>
       <Navbar />
-      <main className="hh-page" style={{ maxWidth: '800px' }}>
+      <main className="hh-page" style={{ maxWidth: '960px' }}>
+        {/* Header link back to profile */}
         <Link
           to="/profile"
-          className="d-inline-flex align-items-center gap-2 mb-4 text-decoration-none"
+          className="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none"
           style={{ fontSize: 'var(--text-small)', fontWeight: 600, color: 'var(--color-primary)' }}
         >
           <ArrowLeft size={16} />
           <span>Back to profile</span>
         </Link>
 
-        <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-          <div>
-            <h1 className="section-title mb-1">My Food Donations</h1>
-            <p className="food-card-meta mb-0">Track and update the status of your listings.</p>
-          </div>
-          <Link to="/donate" className="btn-hh-primary d-inline-flex align-items-center gap-2">
-            <Plus size={16} strokeWidth={2.5} />
-            <span>Post New Listing</span>
-          </Link>
+        {/* Page Title & Subtitle */}
+        <div className="mb-4">
+          <h1 className="display-title mb-1">My Donated Food</h1>
+          <p className="food-card-meta mb-0" style={{ fontSize: 'var(--text-base)' }}>
+            Complete history of your food donations, pickups, and completed listings.
+          </p>
         </div>
 
+        {/* 3 Stat Cards: Total Donations, Picked Up, Expired */}
+        <div className="row g-3 mb-4">
+          <div className="col-12 col-md-4">
+            <div className="donor-stat-card">
+              <div className="donor-stat-icon total">
+                <Package size={22} />
+              </div>
+              <div>
+                <div className="donor-stat-value">{totalCount}</div>
+                <div className="donor-stat-label">Total Donations</div>
+              </div>
+            </div>
+          </div>
+          <div className="col-12 col-md-4">
+            <div className="donor-stat-card">
+              <div className="donor-stat-icon completed">
+                <CheckCircle2 size={22} />
+              </div>
+              <div>
+                <div className="donor-stat-value">{pickedUpCount}</div>
+                <div className="donor-stat-label">Picked Up</div>
+              </div>
+            </div>
+          </div>
+          <div className="col-12 col-md-4">
+            <div className="donor-stat-card">
+              <div className="donor-stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+                <AlertCircle size={22} />
+              </div>
+              <div>
+                <div className="donor-stat-value">{expiredCount}</div>
+                <div className="donor-stat-label">Expired</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Navigation Tabs */}
+        <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+          <div className="donor-nav-tabs">
+            <button
+              className={`donor-nav-tab ${filterTab === 'all' ? 'active' : ''}`}
+              onClick={() => setFilterTab('all')}
+            >
+              <span>All Donations</span>
+            </button>
+            <button
+              className={`donor-nav-tab ${filterTab === 'pickedUp' ? 'active' : ''}`}
+              onClick={() => setFilterTab('pickedUp')}
+            >
+              <span>Picked Up</span>
+            </button>
+            <button
+              className={`donor-nav-tab ${filterTab === 'expired' ? 'active' : ''}`}
+              onClick={() => setFilterTab('expired')}
+            >
+              <span>Expired</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Loading skeleton */}
         {loading && (
           <div className="d-flex flex-column gap-3">
-            {[1, 2].map((i) => (
+            {[1, 2, 3].map((i) => (
               <div key={i} className="hh-card p-4">
-                <div className="skeleton-box mb-2" style={{ width: '50%', height: '24px' }} />
-                <div className="skeleton-box mb-3" style={{ width: '35%', height: '16px' }} />
-                <div className="skeleton-box" style={{ width: '80%', height: '20px' }} />
+                <div className="skeleton-box mb-2" style={{ width: '40%', height: '24px' }} />
+                <div className="skeleton-box mb-3" style={{ width: '60%', height: '16px' }} />
+                <div className="skeleton-box" style={{ width: '30%', height: '20px' }} />
               </div>
             ))}
           </div>
         )}
 
-        {!loading && items.length === 0 && (
+        {/* Empty state */}
+        {!loading && filteredItems.length === 0 && (
           <div className="empty-state text-center py-5">
             <div className="mb-3">
               <Inbox size={56} color="var(--color-text-muted)" strokeWidth={1.5} />
             </div>
-            <h3 className="section-title mb-2">No donations posted yet</h3>
-            <p className="empty-state-text mb-4" style={{ textAlign: 'center', margin: '0 auto var(--space-4)' }}>
-              Whenever you have extra food, list it here so someone in your community can pick it up!
-            </p>
-            <Link to="/donate" className="btn-hh-secondary d-inline-flex align-items-center gap-2">
-              <Plus size={16} />
-              <span>Post Your First Donation</span>
-            </Link>
+            <h3 className="section-title mb-0">
+              {filterTab === 'pickedUp'
+                ? 'No picked up donations yet'
+                : filterTab === 'expired'
+                ? 'No expired food donations'
+                : 'No donations posted yet'}
+            </h3>
           </div>
         )}
 
-        {!loading && items.length > 0 && (
+        {/* Donation listings */}
+        {!loading && filteredItems.length > 0 && (
           <div className="d-flex flex-column gap-3">
-            {items.map((item) => {
-              const isNonVeg =
-                item.foodType?.toLowerCase().includes('non') || item.type?.toLowerCase().includes('non');
-              const isBusy = updatingId === item.id;
+            {filteredItems.map((item) => {
+              const expired = isListingExpired(item);
+              const isNonVeg = item.foodType === 'nonveg' || String(item.foodType).toLowerCase().includes('non');
+              const isMixed = item.foodType === 'mixed';
+              const dietClass = isNonVeg ? 'non-veg' : isMixed ? 'mixed' : 'veg';
+              const dietLabel = isNonVeg ? 'Non-Veg' : isMixed ? 'Mixed' : 'Veg';
+              const dateVal = item.expiryAt || item.pickupTo || item.availableUpto;
 
               return (
-                <div className="hh-card mb-0" key={item.id}>
-                  <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
-                    <div>
-                      <div className="d-flex align-items-center gap-2 mb-1">
-                        <span
-                          className={`diet-symbol ${isNonVeg ? 'non-veg' : 'veg'}`}
-                          title={isNonVeg ? 'Non-Vegetarian' : 'Vegetarian'}
-                        >
-                          <span className="diet-dot" />
-                        </span>
-                        <h3 className="card-title m-0">{item.foodName}</h3>
-                      </div>
-                      <p className="food-card-meta mb-0 d-flex align-items-center gap-1">
-                        <Clock size={13} />
-                        <span>
-                          Available until:{' '}
-                          {new Date(item.availableUpto).toLocaleString([], {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })}
-                        </span>
-                      </p>
+                <div className="hh-card p-4 mb-0" key={item.id || item._id}>
+                  <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                    <div className="d-flex align-items-center gap-2">
+                      <span className={`diet-symbol ${dietClass}`} title={dietLabel}>
+                        <span className="diet-dot" />
+                      </span>
+                      <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                        {item.title || item.foodName}
+                      </h3>
+                      <span className="badge" style={{ fontSize: '11px', background: 'var(--color-surface-2)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                        {dietLabel}
+                      </span>
                     </div>
-                    <span className={getBadgeClass(item.status)}>{statusLabel(item.status)}</span>
+                    <div>{getStatusBadge(item.status, expired)}</div>
                   </div>
 
                   <div
@@ -158,43 +233,62 @@ export default function MyDonatedFood() {
                     <div>
                       <span className="text-muted d-block small">Quantity</span>
                       <strong className="d-flex align-items-center gap-1">
-                        <Package size={14} /> {item.quantity}
+                        <Package size={14} /> {item.quantity || '1 portion'}
                       </strong>
                     </div>
-                    <div>
-                      <span className="text-muted d-block small">Category</span>
-                      <strong>{isNonVeg ? 'Non-Vegetarian' : 'Vegetarian'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-muted d-block small">Status</span>
-                      <strong>{statusLabel(item.status)}</strong>
-                    </div>
+
+                    {item.city && (
+                      <div>
+                        <span className="text-muted d-block small">City</span>
+                        <strong className="d-flex align-items-center gap-1">
+                          <MapPin size={14} /> {item.city}
+                        </strong>
+                      </div>
+                    )}
+
+                    {dateVal && (
+                      <div>
+                        <span className="text-muted d-block small">
+                          {item.status === 'pickedUp' || item.status === 'picked_up'
+                            ? 'Pickup Completed'
+                            : expired
+                            ? 'Expired At'
+                            : 'Available Until'}
+                        </span>
+                        <strong className="d-flex align-items-center gap-1">
+                          <Clock size={14} /> {formatDate(dateVal)}
+                        </strong>
+                      </div>
+                    )}
+
+                    {item.createdAt && (
+                      <div>
+                        <span className="text-muted d-block small">Posted On</span>
+                        <strong className="d-flex align-items-center gap-1">
+                          <Calendar size={14} /> {formatDate(item.createdAt)}
+                        </strong>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="d-flex justify-content-end gap-2">
-                    {item.status === 'available' && (
-                      <button
-                        className="btn-hh-primary d-inline-flex align-items-center gap-1"
-                        style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-small)' }}
-                        disabled={isBusy}
-                        onClick={() => markAccepted(item.id)}
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>{isBusy ? 'Updating...' : 'Mark as Accepted'}</span>
-                      </button>
-                    )}
-                    {item.status === 'accepted' && (
-                      <button
-                        className="btn-hh-primary d-inline-flex align-items-center gap-1"
-                        style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-small)' }}
-                        disabled={isBusy}
-                        onClick={() => markPickedUp(item.id)}
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>{isBusy ? 'Updating...' : 'Mark as Picked Up'}</span>
-                      </button>
-                    )}
-                  </div>
+                  {/* Recipient NGO Info if accepted or picked up */}
+                  {(item.bookedByNgoName || item.acceptedNgoName) && (
+                    <div
+                      className="d-flex align-items-center gap-2 px-3 py-2 rounded"
+                      style={{
+                        background: 'var(--color-primary-light)',
+                        color: 'var(--color-primary)',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <Building2 size={16} />
+                      <span>
+                        {item.status === 'pickedUp' || item.status === 'picked_up' ? 'Picked up by: ' : 'Reserved for NGO: '}
+                        <strong>{item.bookedByNgoName || item.acceptedNgoName}</strong>
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}

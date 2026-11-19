@@ -335,8 +335,8 @@ async function createDonation(req, res) {
     const rawTo = pickupTo || availableUpto;
     const rawExp = expiryAt || rawTo;
 
-    if (!rawFrom || !rawTo || !rawExp) {
-      return res.status(400).json({ message: 'Pickup start time, pickup end time, and expiry time are all required' });
+    if (!rawFrom || !rawTo) {
+      return res.status(400).json({ message: 'Pickup start time and pickup available end time are required' });
     }
 
     const fromDate = new Date(rawFrom);

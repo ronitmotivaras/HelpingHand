@@ -10,6 +10,7 @@ import DonateFood from './pages/DonateFood';
 import Profile from './pages/Profile';
 import ChangePassword from './pages/ChangePassword';
 import Notifications from './pages/Notifications';
+import MyDonatedFood from './pages/MyDonatedFood';
 import { useAuth } from './context/AuthContext';
 import './App.css';
 
@@ -89,10 +90,18 @@ export default function App() {
         }
       />
       <Route
+        path="/my-donated-food"
+        element={
+          <ProtectedRoute>
+            <MyDonatedFood />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/my-donations"
         element={
           <ProtectedRoute>
-            <DonorDashboard />
+            <MyDonatedFood />
           </ProtectedRoute>
         }
       />

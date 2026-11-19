@@ -193,15 +193,6 @@ async function setNgoPending(req, res) {
       { arrayFilters: [{ 'elem.ngoId': user._id, 'elem.status': 'pending' }] }
     );
 
-    // Notify NGO
-    await sendNotification({
-      userId: user._id,
-      type: 'status_changed',
-      title: 'NGO Verification Status',
-      message: 'Your organization verification status was moved back to Pending review.',
-      link: '/feed',
-    });
-
     return res.json(sanitizeUser(user));
   } catch (err) {
     return res.status(500).json({ message: 'Failed to update NGO status' });
@@ -374,15 +365,6 @@ async function unblockUser(req, res) {
     // Remove phone numbers from BlockedPhone collection
     const phones = [user.mobile, user.ngoDetails?.contactNum, user.ngoDetails?.coordinatorPhone].filter(Boolean);
     await BlockedPhone.deleteMany({ phone: { $in: phones } });
-
-    // Send notification to user
-    await sendNotification({
-      userId: user._id,
-      type: 'general',
-      title: 'Account Unblocked',
-      message: 'Your account has been unblocked by the administrator.',
-      link: isNgo ? '/feed' : '/my-donations',
-    });
 
     return res.json(sanitizeUser(user));
   } catch (err) {

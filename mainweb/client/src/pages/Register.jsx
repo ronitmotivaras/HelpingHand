@@ -1,9 +1,21 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Leaf, UserCircle, Phone, Lock, MapPin, AlertCircle, Building2, User, ArrowLeft } from 'lucide-react';
+import {
+  Leaf,
+  UserCircle,
+  Phone,
+  Lock,
+  MapPin,
+  AlertCircle,
+  Building2,
+  User,
+  ArrowLeft,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { validatePassword, validateMobile } from '../utils/validation';
+import { validatePassword, validateMobile, validateName, validateAddress } from '../utils/validation';
 import { CITIES } from '../constants/cities';
 
 export default function Register() {
@@ -31,6 +43,16 @@ export default function Register() {
     confirmPassword: '',
   });
 
+  // Password Visibility States
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Password Focus States (to display password rules on click/focus)
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [ngoPasswordFocused, setNgoPasswordFocused] = useState(false);
+
+  // Validation States
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState([]);
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -42,55 +64,83 @@ export default function Register() {
 
   function handleAccountTypeChange(type) {
     setAccountType(type);
+    setHasSubmitted(false);
     setPasswordErrors([]);
     setConfirmPasswordError('');
     setFieldErrors({});
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setPasswordFocused(false);
+    setNgoPasswordFocused(false);
   }
 
   function updateDonator(field, value) {
-    setDonatorForm((prev) => ({ ...prev, [field]: value }));
+    let finalVal = value;
     if (field === 'mobile') {
-      if (/[^0-9]/.test(value)) {
-        setFieldErrors((prev) => ({ ...prev, mobile: 'Only numbers (0-9) are allowed. No characters, symbols, or spaces.' }));
-      } else if (value.length > 0 && value.length !== 10) {
-        setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number must be exactly 10 digits' }));
-      } else {
-        setFieldErrors((prev) => ({ ...prev, mobile: '' }));
-      }
-    } else if (fieldErrors[field]) {
+      // Allow only numbers and stop after 10 digits
+      finalVal = value.replace(/\D/g, '').slice(0, 10);
+    }
+    setDonatorForm((prev) => ({ ...prev, [field]: finalVal }));
+
+    // Clear field-specific error on user input if previously marked
+    if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+    if (field === 'password' && passwordErrors.length > 0) {
+      setPasswordErrors([]);
+    }
+    if (field === 'confirmPassword' && confirmPasswordError) {
+      setConfirmPasswordError('');
     }
   }
 
   function updateNgo(field, value) {
-    setNgoForm((prev) => ({ ...prev, [field]: value }));
+    let finalVal = value;
     if (field === 'mobile') {
-      if (/[^0-9]/.test(value)) {
-        setFieldErrors((prev) => ({ ...prev, mobile: 'Only numbers (0-9) are allowed. No characters, symbols, or spaces.' }));
-      } else if (value.length > 0 && value.length !== 10) {
-        setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number must be exactly 10 digits' }));
-      } else {
-        setFieldErrors((prev) => ({ ...prev, mobile: '' }));
-      }
-    } else if (fieldErrors[field]) {
+      // Allow only numbers and stop after 10 digits
+      finalVal = value.replace(/\D/g, '').slice(0, 10);
+    }
+    setNgoForm((prev) => ({ ...prev, [field]: finalVal }));
+
+    // Clear field-specific error on user input if previously marked
+    if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+    if (field === 'password' && passwordErrors.length > 0) {
+      setPasswordErrors([]);
+    }
+    if (field === 'confirmPassword' && confirmPasswordError) {
+      setConfirmPasswordError('');
     }
   }
 
   async function handleDonatorSubmit(e) {
     e.preventDefault();
-
-    const pErrors = validatePassword(donatorForm.password);
-    let cError = '';
-    if (donatorForm.password !== donatorForm.confirmPassword) {
-      cError = 'Passwords do not match';
-    }
+    setHasSubmitted(true);
 
     const errors = {};
-    if (!donatorForm.name.trim()) errors.name = 'Please enter your full name';
+
+    // 1. Name validation: alphabets and spaces only
+    const nameErr = validateName(donatorForm.name, 'Full Name');
+    if (nameErr) errors.name = nameErr;
+
+    // 2. Mobile validation: 10 digits only
     const mError = validateMobile(donatorForm.mobile);
     if (mError) errors.mobile = mError;
+
+    // 3. City validation
     if (!donatorForm.city.trim()) errors.city = 'Please select your city';
+
+    // 4. Password validation: 6-14 chars, A-Za-z0-9@ only
+    const pErrors = validatePassword(donatorForm.password);
+
+    // 5. Confirm password
+    let cError = '';
+    if (!donatorForm.confirmPassword) {
+      cError = 'Please re-enter your password';
+    } else if (donatorForm.password !== donatorForm.confirmPassword) {
+      cError = 'Passwords do not match';
+    }
 
     setPasswordErrors(pErrors);
     setConfirmPasswordError(cError);
@@ -111,9 +161,13 @@ export default function Register() {
         confirmPassword: donatorForm.confirmPassword,
       });
       toast.success('Donator account created successfully! Please sign in.');
-      navigate('/login', { state: { mobile: donatorForm.mobile } });
+      navigate('/login');
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
+      const errorMsg = err.response?.data?.message || err.message || 'Registration failed. Please try again.';
+      if (err.response?.status === 409 || errorMsg.toLowerCase().includes('already registered')) {
+        setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number is already registered' }));
+      }
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -121,20 +175,39 @@ export default function Register() {
 
   async function handleNgoSubmit(e) {
     e.preventDefault();
-
-    const pErrors = validatePassword(ngoForm.password);
-    let cError = '';
-    if (ngoForm.password !== ngoForm.confirmPassword) {
-      cError = 'Passwords do not match';
-    }
+    setHasSubmitted(true);
 
     const errors = {};
-    if (!ngoForm.ngoName.trim()) errors.ngoName = 'Please enter NGO name';
+
+    // 1. NGO Name validation: alphabets and spaces only
+    const ngoNameErr = validateName(ngoForm.ngoName, 'NGO Name');
+    if (ngoNameErr) errors.ngoName = ngoNameErr;
+
+    // 2. Mobile validation: 10 digits only
     const mError = validateMobile(ngoForm.mobile);
     if (mError) errors.mobile = mError;
+
+    // 3. City validation
     if (!ngoForm.city.trim()) errors.city = 'Please select NGO city';
-    if (!ngoForm.address.trim()) errors.address = 'Please enter operating address';
-    if (!ngoForm.coordinatorName.trim()) errors.coordinatorName = 'Please enter coordinator name';
+
+    // 4. Address validation: letters, numbers, spaces only (no symbols)
+    const addressErr = validateAddress(ngoForm.address);
+    if (addressErr) errors.address = addressErr;
+
+    // 5. Coordinator Name validation: alphabets and spaces only
+    const coordErr = validateName(ngoForm.coordinatorName, 'Coordinator Name');
+    if (coordErr) errors.coordinatorName = coordErr;
+
+    // 6. Password validation: 6-14 chars, A-Za-z0-9@ only
+    const pErrors = validatePassword(ngoForm.password);
+
+    // 7. Confirm password
+    let cError = '';
+    if (!ngoForm.confirmPassword) {
+      cError = 'Please re-enter your password';
+    } else if (ngoForm.password !== ngoForm.confirmPassword) {
+      cError = 'Passwords do not match';
+    }
 
     setPasswordErrors(pErrors);
     setConfirmPasswordError(cError);
@@ -157,9 +230,13 @@ export default function Register() {
         confirmPassword: ngoForm.confirmPassword,
       });
       toast.success('NGO verification application submitted! Please sign in.');
-      navigate('/login', { state: { mobile: ngoForm.mobile.trim() } });
+      navigate('/login');
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || 'NGO Registration failed. Please try again.');
+      const errorMsg = err.response?.data?.message || err.message || 'NGO Registration failed. Please try again.';
+      if (err.response?.status === 409 || errorMsg.toLowerCase().includes('already registered')) {
+        setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number is already registered' }));
+      }
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -213,7 +290,7 @@ export default function Register() {
 
         {/* DONATOR REGISTRATION FORM */}
         {accountType === 'donator' && (
-          <form onSubmit={handleDonatorSubmit}>
+          <form onSubmit={handleDonatorSubmit} noValidate>
             <div className="form-group mb-2">
               <label className="form-label" htmlFor="donator-name" style={{ marginBottom: '3px', fontSize: '13px' }}>Full Name</label>
               <div style={{ position: 'relative' }}>
@@ -232,14 +309,16 @@ export default function Register() {
                 <input
                   id="donator-name"
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
-                  placeholder="e.g. Ramesh Patel"
+                  style={{
+                    paddingLeft: '2.4rem',
+                    borderColor: hasSubmitted && fieldErrors.name ? '#dc2626' : undefined,
+                  }}
+                  placeholder="Enter name"
                   value={donatorForm.name}
                   onChange={(e) => updateDonator('name', e.target.value)}
-                  required
                 />
               </div>
-              {fieldErrors.name && (
+              {hasSubmitted && fieldErrors.name && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{fieldErrors.name}</span>
@@ -264,15 +343,19 @@ export default function Register() {
                 </div>
                 <input
                   id="donator-mobile"
+                  type="tel"
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
-                  placeholder="e.g. 9876543210"
+                  style={{
+                    paddingLeft: '2.4rem',
+                    borderColor: hasSubmitted && fieldErrors.mobile ? '#dc2626' : undefined,
+                  }}
+                  placeholder="Enter mobile number (10 digit)"
                   value={donatorForm.mobile}
                   onChange={(e) => updateDonator('mobile', e.target.value)}
-                  required
+                  maxLength={10}
                 />
               </div>
-              {fieldErrors.mobile && (
+              {hasSubmitted && fieldErrors.mobile && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{fieldErrors.mobile}</span>
@@ -298,10 +381,12 @@ export default function Register() {
                 <select
                   id="donator-city"
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
+                  style={{
+                    paddingLeft: '2.4rem',
+                    borderColor: hasSubmitted && fieldErrors.city ? '#dc2626' : undefined,
+                  }}
                   value={donatorForm.city}
                   onChange={(e) => updateDonator('city', e.target.value)}
-                  required
                 >
                   <option value="">Select your city...</option>
                   {CITIES.map((c) => (
@@ -311,7 +396,7 @@ export default function Register() {
                   ))}
                 </select>
               </div>
-              {fieldErrors.city && (
+              {hasSubmitted && fieldErrors.city && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{fieldErrors.city}</span>
@@ -319,7 +404,7 @@ export default function Register() {
               )}
             </div>
 
-            {/* Separated Password and Confirm Password (each on its own line) */}
+            {/* Separated Password and Confirm Password with Eye Icons */}
             <div className="form-group mb-2">
               <label className="form-label" htmlFor="donator-password" style={{ marginBottom: '3px', fontSize: '13px' }}>Password</label>
               <div style={{ position: 'relative' }}>
@@ -337,17 +422,69 @@ export default function Register() {
                 </div>
                 <input
                   id="donator-password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
+                  style={{
+                    paddingLeft: '2.4rem',
+                    paddingRight: '2.5rem',
+                    borderColor: hasSubmitted && (passwordErrors.length > 0 || fieldErrors.password) ? '#dc2626' : undefined,
+                  }}
                   placeholder="Enter password"
                   value={donatorForm.password}
                   onChange={(e) => updateDonator('password', e.target.value)}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
                   onPaste={(e) => e.preventDefault()}
-                  required
+                  maxLength={14}
                 />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    color: 'var(--color-text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
-              {passwordErrors.map((err, idx) => (
+
+              {/* Password Rules on focus/click */}
+              {passwordFocused && (
+                <div
+                  className="p-2 mt-2 rounded"
+                  style={{
+                    background: 'var(--color-surface-2, #f8fafc)',
+                    border: '1px solid var(--color-border-subtle, #e2e8f0)',
+                    fontSize: '12px',
+                    lineHeight: '1.5',
+                  }}
+                >
+                  <div className="fw-semibold mb-1" style={{ color: 'var(--color-text, #334155)' }}>
+                    Password Rules:
+                  </div>
+                  <ul className="mb-0 ps-3" style={{ color: 'var(--color-text-muted, #64748b)' }}>
+                    <li>A-Z, a-z allowed</li>
+                    <li>0-9 allowed</li>
+                    <li>@ allowed (no other symbols)</li>
+                    <li>Min 6 - 14 max characters</li>
+                  </ul>
+                </div>
+              )}
+
+              {hasSubmitted && passwordErrors.map((err, idx) => (
                 <div key={idx} className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{err}</span>
@@ -372,17 +509,43 @@ export default function Register() {
                 </div>
                 <input
                   id="donator-confirm"
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
+                  style={{
+                    paddingLeft: '2.4rem',
+                    paddingRight: '2.5rem',
+                    borderColor: hasSubmitted && (confirmPasswordError || fieldErrors.confirmPassword) ? '#dc2626' : undefined,
+                  }}
                   placeholder="Re-enter password"
                   value={donatorForm.confirmPassword}
                   onChange={(e) => updateDonator('confirmPassword', e.target.value)}
                   onPaste={(e) => e.preventDefault()}
-                  required
+                  maxLength={14}
                 />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    color: 'var(--color-text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
-              {confirmPasswordError && (
+              {hasSubmitted && confirmPasswordError && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{confirmPasswordError}</span>
@@ -410,9 +573,9 @@ export default function Register() {
           </form>
         )}
 
-        {/* NGO REGISTRATION FORM - Strict order: 1) NGO Name, 2) NGO City, 3) Address, 4) Coordinator Name, 5) Password, 6) Confirm Password */}
+        {/* NGO REGISTRATION FORM */}
         {accountType === 'ngo' && (
-          <form onSubmit={handleNgoSubmit}>
+          <form onSubmit={handleNgoSubmit} noValidate>
             {/* 1) NGO name */}
             <div className="form-group mb-2">
               <label className="form-label" htmlFor="ngo-name" style={{ marginBottom: '3px', fontSize: '13px' }}>NGO Name</label>
@@ -432,14 +595,16 @@ export default function Register() {
                 <input
                   id="ngo-name"
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
-                  placeholder="e.g. Seva Food Relief Foundation"
+                  style={{
+                    paddingLeft: '2.4rem',
+                    borderColor: hasSubmitted && fieldErrors.ngoName ? '#dc2626' : undefined,
+                  }}
+                  placeholder="Enter NGO name"
                   value={ngoForm.ngoName}
                   onChange={(e) => updateNgo('ngoName', e.target.value)}
-                  required
                 />
               </div>
-              {fieldErrors.ngoName && (
+              {hasSubmitted && fieldErrors.ngoName && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{fieldErrors.ngoName}</span>
@@ -465,15 +630,19 @@ export default function Register() {
                 </div>
                 <input
                   id="ngo-mobile"
+                  type="tel"
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
-                  placeholder="e.g. 9876543210"
+                  style={{
+                    paddingLeft: '2.4rem',
+                    borderColor: hasSubmitted && fieldErrors.mobile ? '#dc2626' : undefined,
+                  }}
+                  placeholder="Enter mobile number (10 digit)"
                   value={ngoForm.mobile}
                   onChange={(e) => updateNgo('mobile', e.target.value)}
-                  required
+                  maxLength={10}
                 />
               </div>
-              {fieldErrors.mobile && (
+              {hasSubmitted && fieldErrors.mobile && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{fieldErrors.mobile}</span>
@@ -500,10 +669,12 @@ export default function Register() {
                 <select
                   id="ngo-city"
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
+                  style={{
+                    paddingLeft: '2.4rem',
+                    borderColor: hasSubmitted && fieldErrors.city ? '#dc2626' : undefined,
+                  }}
                   value={ngoForm.city}
                   onChange={(e) => updateNgo('city', e.target.value)}
-                  required
                 >
                   <option value="">Select NGO city...</option>
                   {CITIES.map((c) => (
@@ -513,7 +684,7 @@ export default function Register() {
                   ))}
                 </select>
               </div>
-              {fieldErrors.city && (
+              {hasSubmitted && fieldErrors.city && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{fieldErrors.city}</span>
@@ -521,19 +692,21 @@ export default function Register() {
               )}
             </div>
 
-            {/* 3) Address */}
+            {/* 4) Address (alphabets, numbers, spaces only) */}
             <div className="form-group mb-2">
               <label className="form-label" htmlFor="ngo-address" style={{ marginBottom: '3px', fontSize: '13px' }}>Address</label>
               <textarea
                 id="ngo-address"
                 className="form-control"
                 rows="2"
-                placeholder="Operating address, community center, or kitchen..."
+                placeholder="Enter address"
+                style={{
+                  borderColor: hasSubmitted && fieldErrors.address ? '#dc2626' : undefined,
+                }}
                 value={ngoForm.address}
                 onChange={(e) => updateNgo('address', e.target.value)}
-                required
               />
-              {fieldErrors.address && (
+              {hasSubmitted && fieldErrors.address && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{fieldErrors.address}</span>
@@ -541,7 +714,7 @@ export default function Register() {
               )}
             </div>
 
-            {/* 4) Coordinator Name */}
+            {/* 5) Coordinator Name (alphabets and spaces only) */}
             <div className="form-group mb-2">
               <label className="form-label" htmlFor="ngo-coordinator-name" style={{ marginBottom: '3px', fontSize: '13px' }}>Coordinator Name</label>
               <div style={{ position: 'relative' }}>
@@ -560,14 +733,16 @@ export default function Register() {
                 <input
                   id="ngo-coordinator-name"
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
-                  placeholder="e.g. Anjali Sharma"
+                  style={{
+                    paddingLeft: '2.4rem',
+                    borderColor: hasSubmitted && fieldErrors.coordinatorName ? '#dc2626' : undefined,
+                  }}
+                  placeholder="Enter coordinator name"
                   value={ngoForm.coordinatorName}
                   onChange={(e) => updateNgo('coordinatorName', e.target.value)}
-                  required
                 />
               </div>
-              {fieldErrors.coordinatorName && (
+              {hasSubmitted && fieldErrors.coordinatorName && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{fieldErrors.coordinatorName}</span>
@@ -575,7 +750,7 @@ export default function Register() {
               )}
             </div>
 
-            {/* 5) Password (own line) */}
+            {/* 6) Password with Eye Icon */}
             <div className="form-group mb-2">
               <label className="form-label" htmlFor="ngo-password" style={{ marginBottom: '3px', fontSize: '13px' }}>Password</label>
               <div style={{ position: 'relative' }}>
@@ -593,17 +768,69 @@ export default function Register() {
                 </div>
                 <input
                   id="ngo-password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
+                  style={{
+                    paddingLeft: '2.4rem',
+                    paddingRight: '2.5rem',
+                    borderColor: hasSubmitted && (passwordErrors.length > 0 || fieldErrors.password) ? '#dc2626' : undefined,
+                  }}
                   placeholder="Enter password"
                   value={ngoForm.password}
                   onChange={(e) => updateNgo('password', e.target.value)}
+                  onFocus={() => setNgoPasswordFocused(true)}
+                  onBlur={() => setNgoPasswordFocused(false)}
                   onPaste={(e) => e.preventDefault()}
-                  required
+                  maxLength={14}
                 />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    color: 'var(--color-text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
-              {passwordErrors.map((err, idx) => (
+
+              {/* Password Rules on focus/click for NGO */}
+              {ngoPasswordFocused && (
+                <div
+                  className="p-2 mt-2 rounded"
+                  style={{
+                    background: 'var(--color-surface-2, #f8fafc)',
+                    border: '1px solid var(--color-border-subtle, #e2e8f0)',
+                    fontSize: '12px',
+                    lineHeight: '1.5',
+                  }}
+                >
+                  <div className="fw-semibold mb-1" style={{ color: 'var(--color-text, #334155)' }}>
+                    Password Rules:
+                  </div>
+                  <ul className="mb-0 ps-3" style={{ color: 'var(--color-text-muted, #64748b)' }}>
+                    <li>A-Z, a-z allowed</li>
+                    <li>0-9 allowed</li>
+                    <li>@ allowed (no other symbols)</li>
+                    <li>Min 6 - 14 max characters</li>
+                  </ul>
+                </div>
+              )}
+
+              {hasSubmitted && passwordErrors.map((err, idx) => (
                 <div key={idx} className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{err}</span>
@@ -611,7 +838,7 @@ export default function Register() {
               ))}
             </div>
 
-            {/* 6) Confirm Password (own line, separated) */}
+            {/* 7) Confirm Password with Eye Icon */}
             <div className="form-group mb-3">
               <label className="form-label" htmlFor="ngo-confirm-password" style={{ marginBottom: '3px', fontSize: '13px' }}>Confirm Password</label>
               <div style={{ position: 'relative' }}>
@@ -629,17 +856,43 @@ export default function Register() {
                 </div>
                 <input
                   id="ngo-confirm-password"
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   className="form-control"
-                  style={{ paddingLeft: '2.4rem' }}
+                  style={{
+                    paddingLeft: '2.4rem',
+                    paddingRight: '2.5rem',
+                    borderColor: hasSubmitted && (confirmPasswordError || fieldErrors.confirmPassword) ? '#dc2626' : undefined,
+                  }}
                   placeholder="Re-enter password"
                   value={ngoForm.confirmPassword}
                   onChange={(e) => updateNgo('confirmPassword', e.target.value)}
                   onPaste={(e) => e.preventDefault()}
-                  required
+                  maxLength={14}
                 />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    color: 'var(--color-text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
-              {confirmPasswordError && (
+              {hasSubmitted && confirmPasswordError && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={12} />
                   <span>{confirmPasswordError}</span>

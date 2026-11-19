@@ -18,13 +18,12 @@ import {
   Shield,
   Check,
   X,
-  Plus,
   Compass,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
-import { validateMobile } from '../utils/validation';
+import { validateMobile, validateName } from '../utils/validation';
 import { CITIES } from '../constants/cities';
 
 export default function Profile() {
@@ -39,6 +38,7 @@ export default function Profile() {
   const [editAddress, setEditAddress] = useState(user?.ngoDetails?.address || '');
   const [editMobile, setEditMobile] = useState(user?.mobile || '');
   const [editCity, setEditCity] = useState(user?.city || '');
+  const [nameError, setNameError] = useState('');
   const [mobileError, setMobileError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +54,7 @@ export default function Profile() {
     setEditAddress(user?.ngoDetails?.address || '');
     setEditMobile(user?.mobile || '');
     setEditCity(user?.city || '');
+    setNameError('');
     setMobileError('');
     setIsEditing(true);
   }
@@ -65,29 +66,29 @@ export default function Profile() {
     setEditAddress(user?.ngoDetails?.address || '');
     setEditMobile(user?.mobile || '');
     setEditCity(user?.city || '');
+    setNameError('');
     setMobileError('');
   }
 
   function handleMobileChange(val) {
     const cleaned = val.replace(/[^0-9]/g, '').slice(0, 10);
     setEditMobile(cleaned);
-    if (/[^0-9]/.test(val)) {
-      setMobileError('Only numbers (0-9) are allowed. No characters, symbols, or spaces.');
-    } else if (cleaned.length > 0 && cleaned.length !== 10) {
-      setMobileError('Mobile number must be exactly 10 digits');
-    } else {
-      setMobileError('');
-    }
+    if (mobileError) setMobileError('');
   }
 
   async function saveEditing() {
-    if (!editName.trim()) {
-      toast.error(isNgo ? 'Organization name cannot be empty' : 'Name cannot be empty');
+    const nErr = validateName(editName, isNgo ? 'Organization Name' : 'Full Name');
+    if (nErr) {
+      setNameError(nErr);
+      toast.error(nErr);
       return;
     }
-    if (isNgo && !editCoordinatorName.trim()) {
-      toast.error('Coordinator name cannot be empty');
-      return;
+    if (isNgo) {
+      const coordErr = validateName(editCoordinatorName, 'Coordinator Name');
+      if (coordErr) {
+        toast.error(coordErr);
+        return;
+      }
     }
     const mErr = validateMobile(editMobile);
     if (mErr) {
@@ -121,6 +122,8 @@ export default function Profile() {
       await refreshProfile();
       toast.success('Profile updated successfully');
       setIsEditing(false);
+      setNameError('');
+      setMobileError('');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update profile');
     } finally {
@@ -153,29 +156,41 @@ export default function Profile() {
           </button>
         </div>
 
-        {/* Profile Card */}
-        <div className="hh-card mb-4">
-          <div className="d-flex align-items-start justify-content-between mb-3 gap-2">
-            <div className="d-flex align-items-center gap-2 flex-grow-1">
-              {isNgo ? (
-                <Building2 size={28} color="var(--color-primary)" style={{ flexShrink: 0 }} />
-              ) : (
-                <UserCircle size={28} color="var(--color-primary)" style={{ flexShrink: 0 }} />
-              )}
-              {isEditing ? (
-                <div style={{ flexGrow: 1, maxWidth: '340px' }}>
-                  <label className="form-label mb-1" style={{ fontSize: 'var(--text-xs)' }}>
-                    {isNgo ? 'NGO Organization Name' : 'Full Name'}
-                  </label>
-                  <input
-                    className="form-control"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder={isNgo ? 'Organization name' : 'Full name'}
-                    autoFocus
-                  />
-                </div>
-              ) : (
+        {/* Unified Profile Card */}
+        <div className="hh-card mb-4 p-0" style={{ overflow: 'hidden' }}>
+          <div style={{ padding: 'var(--space-5)' }}>
+            <div className="d-flex align-items-start justify-content-between mb-3 gap-2">
+              <div className="d-flex align-items-center gap-2 flex-grow-1">
+                {isNgo ? (
+                  <Building2 size={28} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                ) : (
+                  <UserCircle size={28} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                )}
+                {isEditing ? (
+                  <div style={{ flexGrow: 1, maxWidth: '340px' }}>
+                    <label className="form-label mb-1" style={{ fontSize: 'var(--text-xs)' }}>
+                      {isNgo ? 'NGO Organization Name' : 'Full Name'}
+                    </label>
+                    <input
+                      className="form-control"
+                      style={{
+                        borderColor: nameError ? 'var(--color-danger)' : undefined,
+                      }}
+                      value={editName}
+                      onChange={(e) => {
+                        setEditName(e.target.value);
+                        if (nameError) setNameError('');
+                      }}
+                      placeholder={isNgo ? 'Organization name' : 'Full name'}
+                      autoFocus
+                    />
+                    {nameError && (
+                      <div className="text-danger small mt-1" style={{ fontSize: '11px', lineHeight: 1.2 }}>
+                        {nameError}
+                      </div>
+                    )}
+                  </div>
+                ) : (
                 <div className="d-flex align-items-center gap-2 flex-wrap">
                   <h1 className="section-title mb-0" style={{ fontSize: 'var(--text-2xl)' }}>
                     {user?.ngoDetails?.ngoName || user?.name}
@@ -377,8 +392,8 @@ export default function Profile() {
           )}
         </div>
 
-        {/* Role-Specific Navigation Links */}
-        <div className="hh-card p-0 mb-4" style={{ overflow: 'hidden' }}>
+        {/* Unified Navigation Links inside the single card */}
+        <div style={{ borderTop: '1px solid var(--color-border)' }}>
           <Link
             to="/change-password"
             className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
@@ -409,7 +424,7 @@ export default function Profile() {
           </Link>
 
           {isNgo ? (
-            /* NGO Action: Browse Available Food (NGOs do not donate food) */
+            /* NGO Action: Browse Available Food */
             <Link
               to="/feed"
               className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
@@ -441,73 +456,40 @@ export default function Profile() {
               <ChevronRight size={18} color="var(--color-text-muted)" />
             </Link>
           ) : (
-            /* Donor Actions: My Donated Food & Post Food Donation */
-            <>
-              <Link
-                to="/donor"
-                className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
-                style={{
-                  color: 'var(--color-text)',
-                  borderBottom: '1px solid var(--color-border)',
-                  transition: 'background var(--transition)',
-                }}
-              >
-                <div className="d-flex align-items-center gap-3">
-                  <div
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--color-primary-light)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Package size={18} color="var(--color-primary)" />
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>My Donated Food</div>
-                    <div className="text-muted small">Manage your donation listings & pickup requests</div>
-                  </div>
+            /* Donor Action: My Donated Food (No Post Food Donation) */
+            <Link
+              to="/my-donated-food"
+              className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
+              style={{
+                color: 'var(--color-text)',
+                transition: 'background var(--transition)',
+              }}
+            >
+              <div className="d-flex align-items-center gap-3">
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'var(--color-primary-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Package size={18} color="var(--color-primary)" />
                 </div>
-                <ChevronRight size={18} color="var(--color-text-muted)" />
-              </Link>
-
-              <Link
-                to="/donate"
-                className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
-                style={{
-                  color: 'var(--color-text)',
-                  transition: 'background var(--transition)',
-                }}
-              >
-                <div className="d-flex align-items-center gap-3">
-                  <div
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--color-primary-light)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Plus size={18} color="var(--color-primary)" />
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>Post Food Donation</div>
-                    <div className="text-muted small">List surplus food for pickup by verified NGOs</div>
-                  </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>My Donated Food</div>
+                  <div className="text-muted small">Manage your donation listings & pickup requests</div>
                 </div>
-                <ChevronRight size={18} color="var(--color-text-muted)" />
-              </Link>
-            </>
+              </div>
+              <ChevronRight size={18} color="var(--color-text-muted)" />
+            </Link>
           )}
         </div>
+      </div>
       </main>
     </>
   );

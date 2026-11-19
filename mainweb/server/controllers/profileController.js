@@ -14,6 +14,9 @@ async function updateProfile(req, res) {
     if (!finalName) {
       return res.status(400).json({ message: 'Name is required' });
     }
+    if (!/^[a-zA-Z\s]+$/.test(finalName)) {
+      return res.status(400).json({ message: 'Name can only contain alphabets (a-z, A-Z) and spaces' });
+    }
     if (!mobile || !String(mobile).trim()) {
       return res.status(400).json({ message: 'Mobile number is required' });
     }

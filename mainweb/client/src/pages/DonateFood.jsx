@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Plus, Trash2, AlertTriangle, AlertCircle, Calendar, Clock, Package, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Calendar, Package, Pencil, AlertCircle, Check } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
-import { validateMobile } from '../utils/validation';
+import { validateMobile, validateName, validateAddress } from '../utils/validation';
 
 function getLocalDateTimeString(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -39,52 +39,61 @@ export default function DonateFood() {
     return () => clearInterval(timer);
   }, []);
 
+  // Compute default start time and end time (both start from current time)
+  const defaultTimes = useMemo(() => {
+    const now = new Date();
+    const currentStr = getLocalDateTimeString(now);
+    return { startStr: currentStr, endStr: currentStr };
+  }, []);
+
   // Form state
   const [items, setItems] = useState([
     { name: '', quantity: '', unit: 'portions' },
   ]);
 
   const [form, setForm] = useState({
-    foodType: 'veg',
+    foodType: '', // Not default veg; user must choose
     contactName: user?.name || '',
     phone: user?.mobile || '',
     city: user?.city || 'Ahmedabad',
-    pickupFrom: '',
-    pickupTo: '',
-    expiryAt: '',
+    pickupFrom: defaultTimes.startStr,
+    pickupTo: defaultTimes.endStr,
     address: '',
   });
 
-  const [nameError, setNameError] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  // Edit locks: not allowed to edit name or phone until edit icon is clicked
+  const [canEditName, setCanEditName] = useState(false);
+  const [canEditPhone, setCanEditPhone] = useState(false);
+
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   function updateForm(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleContactNameChange(val) {
-    if (val.length > 100) return;
-    updateForm('contactName', val);
-    if (!val.trim()) {
-      setNameError('Contact person name is required');
-    } else if (!/^[a-zA-Z\s]+$/.test(val)) {
-      setNameError('Contact name can only contain alphabets and spaces');
+  // Handle pickup times with past-time restriction
+  function handlePickupFromChange(val) {
+    const minNow = getLocalDateTimeString();
+    if (val < minNow) {
+      toast.error('Pickup start time cannot be in the past');
+      updateForm('pickupFrom', minNow);
     } else {
-      setNameError('');
+      updateForm('pickupFrom', val);
     }
+    if (fieldErrors.pickupFrom) setFieldErrors((prev) => ({ ...prev, pickupFrom: '' }));
   }
 
-  function handlePhoneChange(val) {
-    const cleaned = val.replace(/[^0-9]/g, '').slice(0, 10);
-    updateForm('phone', cleaned);
-    if (/[^0-9]/.test(val)) {
-      setPhoneError('Only numbers (0-9) are allowed. No characters, symbols, or spaces.');
-    } else if (cleaned.length > 0 && cleaned.length !== 10) {
-      setPhoneError('Mobile number must be exactly 10 digits');
-    } else {
-      setPhoneError('');
+  function handlePickupToChange(val) {
+    const minNow = getLocalDateTimeString();
+    const effectiveMin = form.pickupFrom && form.pickupFrom > minNow ? form.pickupFrom : minNow;
+    if (val < effectiveMin) {
+      toast.error('Pickup available end time cannot be before pickup start time or in the past');
+      return;
     }
+    updateForm('pickupTo', val);
+    if (fieldErrors.pickupTo) setFieldErrors((prev) => ({ ...prev, pickupTo: '' }));
   }
 
   // Manage multiple item rows
@@ -94,6 +103,9 @@ export default function DonateFood() {
       copy[index] = { ...copy[index], [field]: value };
       return copy;
     });
+    if (fieldErrors.items) {
+      setFieldErrors((prev) => ({ ...prev, items: '' }));
+    }
   }
 
   function handleAddItem() {
@@ -128,104 +140,76 @@ export default function DonateFood() {
     };
   }, [items]);
 
-  // Warning when expiry is before pickup window end
-  const expiryBeforePickupWarning = useMemo(() => {
-    if (form.pickupTo && form.expiryAt) {
-      const pTo = new Date(form.pickupTo).getTime();
-      const exp = new Date(form.expiryAt).getTime();
-      return exp < pTo;
-    }
-    return false;
-  }, [form.pickupTo, form.expiryAt]);
-
   async function handleSubmit(e) {
     e.preventDefault();
+    setHasSubmitted(true);
 
-    // Validate items
+    const errors = {};
+
+    // 1. Contact Person Name validation (alphabets and spaces only)
+    const nErr = validateName(form.contactName, 'Contact Person');
+    if (nErr) errors.contactName = nErr;
+
+    // 2. Mobile validation (10 digits only)
+    const mErr = validateMobile(form.phone);
+    if (mErr) errors.phone = mErr;
+
+    // 3. City validation
+    if (!form.city.trim()) errors.city = 'Please select a city';
+
+    // 4. Address validation (letters, numbers, spaces only)
+    const aErr = validateAddress(form.address);
+    if (aErr) errors.address = aErr;
+
+    // 5. Food Category validation (user must choose from options)
+    if (!form.foodType) errors.foodType = 'Please select a food category';
+
+    // 6. Items validation
     const validItems = items.filter((it) => it.name.trim() && it.quantity);
     if (validItems.length === 0) {
-      toast.error('Please enter at least one food item with name and quantity');
-      return;
-    }
-
-    for (const it of validItems) {
-      const q = parseFloat(it.quantity);
-      if (isNaN(q) || q <= 0) {
-        toast.error(`Please enter a valid positive quantity for "${it.name}"`);
-        return;
+      errors.items = 'Please enter at least one food item with name and quantity';
+    } else {
+      for (const it of validItems) {
+        const q = parseFloat(it.quantity);
+        if (isNaN(q) || q <= 0) {
+          errors.items = `Please enter a valid positive quantity for "${it.name}"`;
+          break;
+        }
       }
     }
 
-    if (!form.contactName.trim()) {
-      setNameError('Contact person name is required');
-      toast.error('Contact person name is required');
-      return;
+    // 7. Pickup Window validation (pickupFrom and pickupTo only, no expiry)
+    if (!form.pickupFrom) errors.pickupFrom = 'Pickup start time is required';
+    if (!form.pickupTo) errors.pickupTo = 'Pickup available end time is required';
+
+    if (form.pickupFrom && form.pickupTo) {
+      const fromDate = new Date(form.pickupFrom);
+      const toDate = new Date(form.pickupTo);
+      const nowWithBuffer = Date.now() - 30000;
+      if (fromDate.getTime() < nowWithBuffer) {
+        errors.pickupFrom = 'Pickup start time cannot be in the past';
+      }
+      if (toDate.getTime() < nowWithBuffer) {
+        errors.pickupTo = 'Pickup available end time cannot be in the past';
+      }
+      if (toDate.getTime() <= fromDate.getTime()) {
+        errors.pickupTo = 'Pickup available end time must be after pickup start time';
+      }
     }
 
-    if (!/^[a-zA-Z\s]+$/.test(form.contactName.trim())) {
-      setNameError('Contact name can only contain alphabets and spaces');
-      toast.error('Contact name can only contain alphabets and spaces');
-      return;
-    }
+    setFieldErrors(errors);
 
-    if (form.contactName.trim().length > 100) {
-      setNameError('Contact name cannot exceed 100 characters');
-      toast.error('Contact name cannot exceed 100 characters');
-      return;
-    }
-
-    const mError = validateMobile(form.phone);
-    if (mError) {
-      setPhoneError(mError);
-      toast.error(mError);
-      return;
-    }
-
-    if (!form.city.trim()) {
-      toast.error('Please select a city');
-      return;
-    }
-
-    if (!form.pickupFrom || !form.pickupTo || !form.expiryAt) {
-      toast.error('Please specify pickup start, pickup end, and food expiry times');
-      return;
-    }
-
-    const fromDate = new Date(form.pickupFrom);
-    const toDate = new Date(form.pickupTo);
-    const expDate = new Date(form.expiryAt);
-
-    const nowWithBuffer = Date.now() - 30000;
-    if (fromDate.getTime() < nowWithBuffer) {
-      toast.error('Pickup start time cannot be in the past. Current time is the minimum.');
-      return;
-    }
-
-    if (toDate.getTime() < nowWithBuffer) {
-      toast.error('Pickup available end time cannot be in the past. Current time is the minimum.');
-      return;
-    }
-
-    if (expDate.getTime() < nowWithBuffer) {
-      toast.error('Food expiry time cannot be in the past. Current time is the minimum.');
-      return;
-    }
-
-    // Rule: pickupTo after pickupFrom
-    if (toDate.getTime() <= fromDate.getTime()) {
-      toast.error('Pickup end time must be after pickup start time');
-      return;
-    }
-
-    // Rule: expiryAt after pickupFrom
-    if (expDate.getTime() <= fromDate.getTime()) {
-      toast.error('Food expiry time must be after pickup start time');
+    if (Object.keys(errors).length > 0) {
+      const firstError = Object.values(errors)[0];
+      toast.error(firstError);
       return;
     }
 
     setLoading(true);
     try {
-      // Send times as ISO strings so India/local time doesn't shift on the server
+      const fromDate = new Date(form.pickupFrom);
+      const toDate = new Date(form.pickupTo);
+
       await api.post('/food', {
         items: validItems,
         foodType: form.foodType,
@@ -235,7 +219,7 @@ export default function DonateFood() {
         address: form.address.trim(),
         pickupFrom: fromDate.toISOString(),
         pickupTo: toDate.toISOString(),
-        expiryAt: expDate.toISOString(),
+        expiryAt: toDate.toISOString(), // Defaults expiry to pickupTo
       });
 
       toast.success('Food donation listing published successfully!');
@@ -255,7 +239,7 @@ export default function DonateFood() {
       <main className="hh-page" style={{ maxWidth: '720px' }}>
         <Link
           to="/"
-          className="d-inline-flex align-items-center gap-2 mb-4 text-decoration-none"
+          className="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none"
           style={{ fontSize: 'var(--text-small)', fontWeight: 600, color: 'var(--color-primary)' }}
         >
           <ArrowLeft size={16} />
@@ -263,30 +247,231 @@ export default function DonateFood() {
         </Link>
 
         <div className="hh-card">
-          <h1 className="section-title mb-1">List Surplus Food</h1>
-          <p className="food-card-meta mb-4">
-            Helping extra food reach nearby community members and relief organizations.
-          </p>
+          <h1 className="section-title mb-4">List Surplus Food</h1>
 
-          <form onSubmit={handleSubmit}>
-            {/* Multiple Food Items Section */}
+          <form onSubmit={handleSubmit} noValidate>
+            {/* 1. Contact Person Name & Mobile Number (input field, read-only until edit icon clicked) */}
+            <div className="row g-3 mb-3">
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="contact-name">Contact Person</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="contact-name"
+                    readOnly={!canEditName}
+                    className="form-control"
+                    style={{
+                      paddingRight: '2.5rem',
+                      backgroundColor: !canEditName ? 'var(--color-surface-2, #f8fafc)' : '#ffffff',
+                      cursor: !canEditName ? 'default' : 'text',
+                      borderColor: hasSubmitted && fieldErrors.contactName ? 'var(--color-danger)' : undefined,
+                    }}
+                    placeholder="Enter name"
+                    maxLength={100}
+                    value={form.contactName}
+                    onChange={(e) => {
+                      if (canEditName) {
+                        updateForm('contactName', e.target.value);
+                        if (fieldErrors.contactName) setFieldErrors((prev) => ({ ...prev, contactName: '' }));
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEditName) {
+                        setCanEditName(true);
+                        setTimeout(() => document.getElementById('contact-name')?.focus(), 50);
+                      } else {
+                        setCanEditName(false);
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      color: canEditName ? 'var(--color-primary)' : 'var(--color-text-muted, #64748b)',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                    title={canEditName ? 'Done editing' : 'Click to edit name'}
+                    aria-label={canEditName ? 'Done editing name' : 'Edit name'}
+                  >
+                    {canEditName ? <Check size={16} /> : <Pencil size={15} />}
+                  </button>
+                </div>
+                {hasSubmitted && fieldErrors.contactName && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{fieldErrors.contactName}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="col-sm-6 form-group">
+                <label className="form-label" htmlFor="contact-phone">Mobile Number</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="contact-phone"
+                    type="tel"
+                    readOnly={!canEditPhone}
+                    className="form-control"
+                    style={{
+                      paddingRight: '2.5rem',
+                      backgroundColor: !canEditPhone ? 'var(--color-surface-2, #f8fafc)' : '#ffffff',
+                      cursor: !canEditPhone ? 'default' : 'text',
+                      borderColor: hasSubmitted && fieldErrors.phone ? 'var(--color-danger)' : undefined,
+                    }}
+                    placeholder="Enter mobile number (10 digit)"
+                    maxLength={10}
+                    value={form.phone}
+                    onChange={(e) => {
+                      if (canEditPhone) {
+                        const clean = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        updateForm('phone', clean);
+                        if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }));
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEditPhone) {
+                        setCanEditPhone(true);
+                        setTimeout(() => document.getElementById('contact-phone')?.focus(), 50);
+                      } else {
+                        setCanEditPhone(false);
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      color: canEditPhone ? 'var(--color-primary)' : 'var(--color-text-muted, #64748b)',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                    title={canEditPhone ? 'Done editing' : 'Click to edit mobile number'}
+                    aria-label={canEditPhone ? 'Done editing mobile number' : 'Edit mobile number'}
+                  >
+                    {canEditPhone ? <Check size={16} /> : <Pencil size={15} />}
+                  </button>
+                </div>
+                {hasSubmitted && fieldErrors.phone && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{fieldErrors.phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. City Option */}
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="donation-city">City</label>
+              <select
+                id="donation-city"
+                className="form-select"
+                style={{
+                  borderColor: hasSubmitted && fieldErrors.city ? 'var(--color-danger)' : undefined,
+                }}
+                value={form.city}
+                onChange={(e) => {
+                  updateForm('city', e.target.value);
+                  if (fieldErrors.city) setFieldErrors((prev) => ({ ...prev, city: '' }));
+                }}
+              >
+                <option value="">Select City...</option>
+                {cityOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              {hasSubmitted && fieldErrors.city && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.city}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Address */}
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="pickup-address">Address</label>
+              <textarea
+                id="pickup-address"
+                className="form-control"
+                rows="2"
+                style={{
+                  borderColor: hasSubmitted && fieldErrors.address ? 'var(--color-danger)' : undefined,
+                }}
+                placeholder="Enter address"
+                value={form.address}
+                onChange={(e) => {
+                  updateForm('address', e.target.value);
+                  if (fieldErrors.address) setFieldErrors((prev) => ({ ...prev, address: '' }));
+                }}
+              />
+              {hasSubmitted && fieldErrors.address && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.address}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Food Category (Option to choose first, not default veg) */}
+            <div className="form-group mb-3">
+              <label className="form-label" htmlFor="food-type">Food Category</label>
+              <select
+                id="food-type"
+                className="form-select"
+                style={{
+                  borderColor: hasSubmitted && fieldErrors.foodType ? 'var(--color-danger)' : undefined,
+                }}
+                value={form.foodType}
+                onChange={(e) => {
+                  updateForm('foodType', e.target.value);
+                  if (fieldErrors.foodType) setFieldErrors((prev) => ({ ...prev, foodType: '' }));
+                }}
+              >
+                <option value="">Select Food Category...</option>
+                <option value="veg">Vegetarian (Veg)</option>
+                <option value="nonveg">Non-Vegetarian (Non-Veg)</option>
+                <option value="mixed">Mixed (Veg &amp; Non-Veg)</option>
+              </select>
+              {hasSubmitted && fieldErrors.foodType && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.foodType}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 5. Food Item Menu (shown in 4th image) */}
             <div className="mb-4">
-              <label className="form-label d-flex justify-content-between align-items-center">
-                <span>Food Items</span>
-                <span className="text-muted small" style={{ fontWeight: 400 }}>
-                  Add multiple rows if donating different food dishes
-                </span>
+              <label className="form-label mb-1" style={{ fontWeight: 600 }}>
+                Food Items
               </label>
 
               {items.map((it, idx) => (
-                <div className="item-row" key={idx}>
+                <div className="item-row mb-2" key={idx}>
                   <div style={{ flex: '1 1 50%' }}>
                     <input
                       className="form-control"
                       placeholder={idx === 0 ? 'e.g. Vegetable Biryani' : 'e.g. Steamed Rice, Dal'}
                       value={it.name}
                       onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                      required
                     />
                   </div>
                   <div style={{ width: '100px' }}>
@@ -298,7 +483,6 @@ export default function DonateFood() {
                       placeholder="Qty"
                       value={it.quantity}
                       onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                      required
                     />
                   </div>
                   <div style={{ width: '120px' }}>
@@ -348,140 +532,23 @@ export default function DonateFood() {
                   </div>
                 )}
               </div>
+              {hasSubmitted && fieldErrors.items && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.items}</span>
+                </div>
+              )}
             </div>
 
-            {/* Food Diet Category */}
-            <div className="row g-3 mb-3">
-              <div className="col-sm-6 form-group">
-                <label className="form-label" htmlFor="food-type">Food Category</label>
-                <select
-                  id="food-type"
-                  className="form-select"
-                  value={form.foodType}
-                  onChange={(e) => updateForm('foodType', e.target.value)}
-                >
-                  <option value="veg">Vegetarian (Veg)</option>
-                  <option value="nonveg">Non-Vegetarian (Non-Veg)</option>
-                  <option value="mixed">Mixed (Veg &amp; Non-Veg)</option>
-                </select>
-                <div className="text-muted" style={{ fontSize: '11px', marginTop: '3px' }}>
-                  Choose Mixed if donation includes both veg and non-veg dishes
-                </div>
-              </div>
-
-              <div className="col-sm-6 form-group">
-                <div className="d-flex justify-content-between align-items-center mb-1">
-                  <label className="form-label mb-0" htmlFor="donation-city">City</label>
-                  <button
-                    type="button"
-                    className="input-edit-btn"
-                    onClick={() => document.getElementById('donation-city')?.focus()}
-                    title="Change city for this order"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit</span>
-                  </button>
-                </div>
-                <select
-                  id="donation-city"
-                  className="form-select"
-                  value={form.city}
-                  onChange={(e) => updateForm('city', e.target.value)}
-                  required
-                >
-                  <option value="">Select City...</option>
-                  {cityOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                <div className="text-muted" style={{ fontSize: '11px', marginTop: '3px' }}>
-                  Update if pickup location is in another city
-                </div>
-              </div>
-            </div>
-
-            {/* Contact Person & Phone */}
-            <div className="row g-3 mb-3">
-              <div className="col-sm-6 form-group">
-                <div className="d-flex justify-content-between align-items-center mb-1">
-                  <label className="form-label mb-0" htmlFor="contact-name">Contact Person</label>
-                  <button
-                    type="button"
-                    className="input-edit-btn"
-                    onClick={() => document.getElementById('contact-name')?.focus()}
-                    title="Edit contact person for this order"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit</span>
-                  </button>
-                </div>
-                <input
-                  id="contact-name"
-                  className={`form-control ${nameError ? 'is-invalid' : ''}`}
-                  placeholder="Full name (alphabets only, max 100)"
-                  maxLength={100}
-                  value={form.contactName}
-                  onChange={(e) => handleContactNameChange(e.target.value)}
-                  required
-                />
-                {nameError ? (
-                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                    <AlertCircle size={13} />
-                    <span>{nameError}</span>
-                  </div>
-                ) : (
-                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '3px' }}>
-                    Alphabets and spaces only (max 100 characters)
-                  </div>
-                )}
-              </div>
-
-              <div className="col-sm-6 form-group">
-                <div className="d-flex justify-content-between align-items-center mb-1">
-                  <label className="form-label mb-0" htmlFor="contact-phone">Phone for Pickup Coordination</label>
-                  <button
-                    type="button"
-                    className="input-edit-btn"
-                    onClick={() => document.getElementById('contact-phone')?.focus()}
-                    title="Edit phone number for this order"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit</span>
-                  </button>
-                </div>
-                <input
-                  id="contact-phone"
-                  className={`form-control ${phoneError ? 'is-invalid' : ''}`}
-                  placeholder="10-digit mobile number"
-                  maxLength={10}
-                  value={form.phone}
-                  onChange={(e) => handlePhoneChange(e.target.value)}
-                  required
-                />
-                {phoneError ? (
-                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                    <AlertCircle size={13} />
-                    <span>{phoneError}</span>
-                  </div>
-                ) : (
-                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '3px' }}>
-                    10 numeric digits only
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Timing Section: pickupFrom, pickupTo, expiryAt */}
-            <div className="p-3 mb-3 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+            {/* 6. Pickup Window (defaults to current time, future only, no past time allowed) */}
+            <div className="p-3 mb-4 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
               <div className="fw-bold mb-2 d-flex align-items-center gap-1" style={{ color: 'var(--color-primary)' }}>
                 <Calendar size={16} />
-                <span>Pickup Window & Expiry Timing</span>
+                <span>Pickup Window</span>
               </div>
 
               <div className="row g-3">
-                <div className="col-sm-4 form-group mb-0">
+                <div className="col-sm-6 form-group mb-0">
                   <label className="form-label" htmlFor="pickup-from" style={{ fontSize: 'var(--text-xs)' }}>
                     Pickup Starts From
                   </label>
@@ -491,16 +558,21 @@ export default function DonateFood() {
                     min={currentMinTime}
                     onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
+                    style={{
+                      borderColor: hasSubmitted && fieldErrors.pickupFrom ? 'var(--color-danger)' : undefined,
+                    }}
                     value={form.pickupFrom}
-                    onChange={(e) => updateForm('pickupFrom', e.target.value)}
-                    required
+                    onChange={(e) => handlePickupFromChange(e.target.value)}
                   />
-                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
-                    Can be future (e.g. tomorrow)
-                  </div>
+                  {hasSubmitted && fieldErrors.pickupFrom && (
+                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                      <AlertCircle size={12} />
+                      <span>{fieldErrors.pickupFrom}</span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="col-sm-4 form-group mb-0">
+                <div className="col-sm-6 form-group mb-0">
                   <label className="form-label" htmlFor="pickup-to" style={{ fontSize: 'var(--text-xs)' }}>
                     Pickup Available Until
                   </label>
@@ -510,67 +582,20 @@ export default function DonateFood() {
                     min={form.pickupFrom && form.pickupFrom > currentMinTime ? form.pickupFrom : currentMinTime}
                     onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
+                    style={{
+                      borderColor: hasSubmitted && fieldErrors.pickupTo ? 'var(--color-danger)' : undefined,
+                    }}
                     value={form.pickupTo}
-                    onChange={(e) => updateForm('pickupTo', e.target.value)}
-                    required
+                    onChange={(e) => handlePickupToChange(e.target.value)}
                   />
-                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
-                    Window close time
-                  </div>
-                </div>
-
-                <div className="col-sm-4 form-group mb-0">
-                  <label className="form-label" htmlFor="expiry-at" style={{ fontSize: 'var(--text-xs)' }}>
-                    Consume Before (Expiry)
-                  </label>
-                  <input
-                    id="expiry-at"
-                    type="datetime-local"
-                    min={form.pickupFrom && form.pickupFrom > currentMinTime ? form.pickupFrom : currentMinTime}
-                    onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
-                    className="form-control"
-                    value={form.expiryAt}
-                    onChange={(e) => updateForm('expiryAt', e.target.value)}
-                    required
-                  />
-                  <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
-                    Food freshness limit
-                  </div>
+                  {hasSubmitted && fieldErrors.pickupTo && (
+                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                      <AlertCircle size={12} />
+                      <span>{fieldErrors.pickupTo}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Warning if expiry is before pickupTo */}
-              {expiryBeforePickupWarning && (
-                <div
-                  className="alert alert-warning d-flex align-items-center gap-2 mt-3 mb-0"
-                  style={{
-                    backgroundColor: '#fffbeb',
-                    borderColor: '#fde68a',
-                    color: '#b45309',
-                    fontSize: 'var(--text-xs)',
-                    padding: '8px 12px',
-                  }}
-                >
-                  <AlertTriangle size={15} className="flex-shrink-0" />
-                  <span>
-                    <strong>Warning:</strong> Food freshness expiry time is earlier than the pickup end time. Ensure food remains safe for consumption!
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Address */}
-            <div className="form-group mb-4">
-              <label className="form-label" htmlFor="pickup-address">Exact Pickup Address</label>
-              <textarea
-                id="pickup-address"
-                className="form-control"
-                rows="3"
-                placeholder="Building name, street, nearby landmarks for NGO pickup..."
-                value={form.address}
-                onChange={(e) => updateForm('address', e.target.value)}
-                required
-              />
             </div>
 
             {/* End Summary: Total item count and total quantity */}
@@ -604,11 +629,12 @@ export default function DonateFood() {
               </div>
             )}
 
-            <div className="pt-2">
+            <div className="pt-1">
               <button
                 className="btn-hh-primary w-100 justify-content-center d-flex align-items-center gap-2"
                 disabled={loading}
                 type="submit"
+                style={{ padding: '10px 16px', fontSize: '15px' }}
               >
                 {loading ? (
                   <>
@@ -618,7 +644,7 @@ export default function DonateFood() {
                 ) : (
                   <>
                     <Plus size={18} />
-                    <span>Publish Food Listing</span>
+                    <span>Publish Food Donation</span>
                   </>
                 )}
               </button>

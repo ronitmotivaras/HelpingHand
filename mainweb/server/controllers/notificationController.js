@@ -2,7 +2,10 @@ const Notification = require('../models/Notification');
 
 async function getNotifications(req, res) {
   try {
-    const notifications = await Notification.find({ userId: req.user._id })
+    const notifications = await Notification.find({
+      userId: req.user._id,
+      title: { $not: /blocked|unblocked|deleted/i },
+    })
       .sort({ createdAt: -1 })
       .limit(50);
     return res.json(notifications);
@@ -16,6 +19,7 @@ async function getUnreadCount(req, res) {
     const unreadCount = await Notification.countDocuments({
       userId: req.user._id,
       isRead: false,
+      title: { $not: /blocked|unblocked|deleted/i },
     });
     return res.json({ unreadCount });
   } catch (err) {
