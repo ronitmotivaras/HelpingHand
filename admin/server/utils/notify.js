@@ -11,6 +11,10 @@ async function sendNotification({
 }) {
   try {
     if (!userId || !message) return null;
+    const text = `${title || ''} ${message || ''}`.toLowerCase();
+    if (/blocked|unblocked|delete/i.test(text)) {
+      return null;
+    }
     return await Notification.create({
       userId,
       type,

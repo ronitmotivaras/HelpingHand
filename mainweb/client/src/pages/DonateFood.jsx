@@ -50,6 +50,7 @@ export default function DonateFood() {
   const [items, setItems] = useState([
     { name: '', quantity: '', unit: 'portions' },
   ]);
+  const [itemErrors, setItemErrors] = useState([{}]);
 
   const [form, setForm] = useState({
     foodType: '', // Not default veg; user must choose
@@ -103,6 +104,13 @@ export default function DonateFood() {
       copy[index] = { ...copy[index], [field]: value };
       return copy;
     });
+    setItemErrors((prev) => {
+      const copy = [...prev];
+      if (copy[index]) {
+        copy[index] = { ...copy[index], [field]: '' };
+      }
+      return copy;
+    });
     if (fieldErrors.items) {
       setFieldErrors((prev) => ({ ...prev, items: '' }));
     }
@@ -110,11 +118,13 @@ export default function DonateFood() {
 
   function handleAddItem() {
     setItems((prev) => [...prev, { name: '', quantity: '', unit: 'portions' }]);
+    setItemErrors((prev) => [...prev, {}]);
   }
 
   function handleRemoveItem(index) {
     if (items.length <= 1) return;
     setItems((prev) => prev.filter((_, i) => i !== index));
+    setItemErrors((prev) => prev.filter((_, i) => i !== index));
   }
 
   // Summary calculation
@@ -164,19 +174,36 @@ export default function DonateFood() {
     // 5. Food Category validation (user must choose from options)
     if (!form.foodType) errors.foodType = 'Please select a food category';
 
-    // 6. Items validation
-    const validItems = items.filter((it) => it.name.trim() && it.quantity);
-    if (validItems.length === 0) {
-      errors.items = 'Please enter at least one food item with name and quantity';
-    } else {
-      for (const it of validItems) {
-        const q = parseFloat(it.quantity);
-        if (isNaN(q) || q <= 0) {
-          errors.items = `Please enter a valid positive quantity for "${it.name}"`;
-          break;
-        }
+    // 6. Items validation (symbols not allowed in name, numbers only in qty)
+    const newItemErrors = items.map((it) => {
+      const err = {};
+      const nameStr = (it.name || '').trim();
+      if (!nameStr) {
+        err.name = 'Please enter food item name';
+      } else if (nameStr.length > 100) {
+        err.name = 'Food name cannot exceed 100 characters';
+      } else if (!/^[a-zA-Z0-9\s,.\-@]+$/.test(nameStr)) {
+        err.name = 'Symbols not allowed';
       }
+
+      const qStr = String(it.quantity || '').trim();
+      if (!qStr) {
+        err.quantity = 'Please enter quantity';
+      } else if (!/^[0-9]+(\.[0-9]+)?$/.test(qStr) || parseFloat(qStr) <= 0) {
+        err.quantity = 'Only numbers allowed';
+      }
+      return err;
+    });
+
+    setItemErrors(newItemErrors);
+    const hasItemError = newItemErrors.some((e) => e.name || e.quantity);
+    if (hasItemError) {
+      errors.items = 'Please check food items marked in red';
     }
+
+    const validItems = items.filter(
+      (it, idx) => !newItemErrors[idx]?.name && !newItemErrors[idx]?.quantity && it.name.trim() && it.quantity
+    );
 
     // 7. Pickup Window validation (pickupFrom and pickupTo only, no expiry)
     if (!form.pickupFrom) errors.pickupFrom = 'Pickup start time is required';
@@ -200,8 +227,6 @@ export default function DonateFood() {
     setFieldErrors(errors);
 
     if (Object.keys(errors).length > 0) {
-      const firstError = Object.values(errors)[0];
-      toast.error(firstError);
       return;
     }
 
@@ -225,7 +250,18 @@ export default function DonateFood() {
       toast.success('Food donation listing published successfully!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to post food listing');
+      const msg = err.response?.data?.message || '';
+      if (/contact|name/i.test(msg)) {
+        setFieldErrors((prev) => ({ ...prev, contactName: msg }));
+      } else if (/phone|mobile/i.test(msg)) {
+        setFieldErrors((prev) => ({ ...prev, phone: msg }));
+      } else if (/address/i.test(msg)) {
+        setFieldErrors((prev) => ({ ...prev, address: msg }));
+      } else if (/city/i.test(msg)) {
+        setFieldErrors((prev) => ({ ...prev, city: msg }));
+      } else {
+        toast.error(msg || 'Failed to post food listing');
+      }
     } finally {
       setLoading(false);
     }
@@ -412,6 +448,7 @@ export default function DonateFood() {
                 id="pickup-address"
                 className="form-control"
                 rows="2"
+                maxLength={1000}
                 style={{
                   borderColor: hasSubmitted && fieldErrors.address ? 'var(--color-danger)' : undefined,
                 }}
@@ -465,25 +502,44 @@ export default function DonateFood() {
               </label>
 
               {items.map((it, idx) => (
-                <div className="item-row mb-2" key={idx}>
+                <div className="item-row mb-2" key={idx} style={{ alignItems: 'flex-start' }}>
                   <div style={{ flex: '1 1 50%' }}>
                     <input
                       className="form-control"
+                      style={{
+                        borderColor: hasSubmitted && itemErrors[idx]?.name ? 'var(--color-danger, #dc2626)' : undefined,
+                      }}
+                      maxLength={100}
                       placeholder={idx === 0 ? 'e.g. Vegetable Biryani' : 'e.g. Steamed Rice, Dal'}
                       value={it.name}
                       onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
                     />
+                    {hasSubmitted && itemErrors[idx]?.name && (
+                      <div className="text-danger small mt-1" style={{ fontSize: '11px', lineHeight: 1.2 }}>
+                        {itemErrors[idx].name}
+                      </div>
+                    )}
                   </div>
                   <div style={{ width: '100px' }}>
                     <input
-                      type="number"
-                      step="any"
-                      min="0.1"
+                      type="text"
+                      inputMode="decimal"
                       className="form-control"
+                      style={{
+                        borderColor: hasSubmitted && itemErrors[idx]?.quantity ? 'var(--color-danger, #dc2626)' : undefined,
+                      }}
                       placeholder="Qty"
                       value={it.quantity}
-                      onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, '');
+                        handleItemChange(idx, 'quantity', val);
+                      }}
                     />
+                    {hasSubmitted && itemErrors[idx]?.quantity && (
+                      <div className="text-danger small mt-1" style={{ fontSize: '11px', lineHeight: 1.2 }}>
+                        {itemErrors[idx].quantity}
+                      </div>
+                    )}
                   </div>
                   <div style={{ width: '120px' }}>
                     <select
@@ -502,6 +558,7 @@ export default function DonateFood() {
                     <button
                       type="button"
                       className="item-remove-btn"
+                      style={{ marginTop: '6px' }}
                       onClick={() => handleRemoveItem(idx)}
                       title="Remove row"
                       aria-label="Remove item"

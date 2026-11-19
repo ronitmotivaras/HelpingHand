@@ -122,7 +122,6 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              <p className="m-0">Surplus food listings available for pickup near you</p>
             </div>
           </div>
         </div>
@@ -260,14 +259,14 @@ export default function Dashboard() {
             </div>
             <h3 className="section-title mb-2">
               {search
-                ? `No results matching "${search}" in ${selectedCity}`
-                : `No food available in ${selectedCity} right now`}
+                ? `No results matching "${search}"`
+                : 'No food available right now'}
             </h3>
-            <p className="empty-state-text mb-4" style={{ textAlign: 'center', margin: '0 auto var(--space-4)' }}>
-              {search
-                ? 'Try checking for typos or searching a different term.'
-                : 'Check back soon, or be the first to share extra food with your community.'}
-            </p>
+            {search && (
+              <p className="empty-state-text mb-4" style={{ textAlign: 'center', margin: '0 auto var(--space-4)' }}>
+                Try checking for typos or searching a different term.
+              </p>
+            )}
             {search && (
               <button
                 type="button"

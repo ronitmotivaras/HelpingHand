@@ -2,12 +2,15 @@ const Notification = require('../models/Notification');
 
 async function getNotifications(req, res) {
   try {
-    const notifications = await Notification.find({
+    const rawNotifications = await Notification.find({
       userId: req.user._id,
-      title: { $not: /blocked|unblocked|deleted/i },
     })
       .sort({ createdAt: -1 })
       .limit(50);
+    const notifications = rawNotifications.filter((n) => {
+      const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+      return !/blocked|unblocked|delete/i.test(text);
+    });
     return res.json(notifications);
   } catch (err) {
     return res.status(500).json({ message: 'Failed to load notifications' });
@@ -16,11 +19,14 @@ async function getNotifications(req, res) {
 
 async function getUnreadCount(req, res) {
   try {
-    const unreadCount = await Notification.countDocuments({
+    const rawNotifications = await Notification.find({
       userId: req.user._id,
       isRead: false,
-      title: { $not: /blocked|unblocked|deleted/i },
     });
+    const unreadCount = rawNotifications.filter((n) => {
+      const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+      return !/blocked|unblocked|delete/i.test(text);
+    }).length;
     return res.json({ unreadCount });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to get unread count' });

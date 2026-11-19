@@ -23,7 +23,7 @@ import {
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
-import { validateMobile, validateName } from '../utils/validation';
+import { validateMobile, validateName, validateNgoName, validateAddress } from '../utils/validation';
 import { CITIES } from '../constants/cities';
 
 export default function Profile() {
@@ -39,7 +39,10 @@ export default function Profile() {
   const [editMobile, setEditMobile] = useState(user?.mobile || '');
   const [editCity, setEditCity] = useState(user?.city || '');
   const [nameError, setNameError] = useState('');
+  const [coordError, setCoordError] = useState('');
   const [mobileError, setMobileError] = useState('');
+  const [cityError, setCityError] = useState('');
+  const [addressError, setAddressError] = useState('');
   const [saving, setSaving] = useState(false);
 
   function handleLogout() {
@@ -55,7 +58,10 @@ export default function Profile() {
     setEditMobile(user?.mobile || '');
     setEditCity(user?.city || '');
     setNameError('');
+    setCoordError('');
     setMobileError('');
+    setCityError('');
+    setAddressError('');
     setIsEditing(true);
   }
 
@@ -67,7 +73,10 @@ export default function Profile() {
     setEditMobile(user?.mobile || '');
     setEditCity(user?.city || '');
     setNameError('');
+    setCoordError('');
     setMobileError('');
+    setCityError('');
+    setAddressError('');
   }
 
   function handleMobileChange(val) {
@@ -77,31 +86,54 @@ export default function Profile() {
   }
 
   async function saveEditing() {
-    const nErr = validateName(editName, isNgo ? 'Organization Name' : 'Full Name');
+    let hasError = false;
+
+    const nErr = isNgo
+      ? validateNgoName(editName, 'NGO Organization Name')
+      : validateName(editName, 'Full Name');
     if (nErr) {
       setNameError(nErr);
-      toast.error(nErr);
-      return;
+      hasError = true;
+    } else {
+      setNameError('');
     }
+
     if (isNgo) {
       const coordErr = validateName(editCoordinatorName, 'Coordinator Name');
       if (coordErr) {
-        toast.error(coordErr);
-        return;
+        setCoordError(coordErr);
+        hasError = true;
+      } else {
+        setCoordError('');
       }
     }
+
     const mErr = validateMobile(editMobile);
     if (mErr) {
       setMobileError(mErr);
-      toast.error(mErr);
-      return;
+      hasError = true;
+    } else {
+      setMobileError('');
     }
+
     if (!editCity.trim()) {
-      toast.error('Please select a city');
-      return;
+      setCityError('Please select a city');
+      hasError = true;
+    } else {
+      setCityError('');
     }
-    if (isNgo && !editAddress.trim()) {
-      toast.error('Organization address cannot be empty');
+
+    if (isNgo) {
+      const addrErr = validateAddress(editAddress);
+      if (addrErr) {
+        setAddressError(addrErr);
+        hasError = true;
+      } else {
+        setAddressError('');
+      }
+    }
+
+    if (hasError) {
       return;
     }
 
@@ -123,9 +155,25 @@ export default function Profile() {
       toast.success('Profile updated successfully');
       setIsEditing(false);
       setNameError('');
+      setCoordError('');
       setMobileError('');
+      setCityError('');
+      setAddressError('');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update profile');
+      const msg = err.response?.data?.message || '';
+      if (/coordinator/i.test(msg)) {
+        setCoordError(msg);
+      } else if (/organization|ngo name|name/i.test(msg)) {
+        setNameError(msg);
+      } else if (/phone|mobile/i.test(msg)) {
+        setMobileError(msg);
+      } else if (/address/i.test(msg)) {
+        setAddressError(msg);
+      } else if (/city/i.test(msg)) {
+        setCityError(msg);
+      } else {
+        toast.error(msg || 'Failed to update profile');
+      }
     } finally {
       setSaving(false);
     }
@@ -176,6 +224,7 @@ export default function Profile() {
                       style={{
                         borderColor: nameError ? 'var(--color-danger)' : undefined,
                       }}
+                      maxLength={100}
                       value={editName}
                       onChange={(e) => {
                         setEditName(e.target.value);
@@ -195,18 +244,6 @@ export default function Profile() {
                   <h1 className="section-title mb-0" style={{ fontSize: 'var(--text-2xl)' }}>
                     {user?.ngoDetails?.ngoName || user?.name}
                   </h1>
-                  {isNgo && user?.ngoStatus === 'approved' && (
-                    <span className="badge-verified-ngo">
-                      <BadgeCheck size={14} />
-                      <span>Verified NGO</span>
-                    </span>
-                  )}
-                  {isNgo && user?.ngoStatus === 'pending' && (
-                    <span className="badge-status pending">
-                      <Clock size={12} />
-                      <span>Verification Pending</span>
-                    </span>
-                  )}
                 </div>
               )}
             </div>
@@ -272,11 +309,24 @@ export default function Profile() {
                 <div style={{ maxWidth: '260px', width: '100%' }}>
                   <input
                     className="form-control"
-                    style={{ padding: '5px 10px', fontSize: 'var(--text-sm)' }}
+                    style={{
+                      padding: '5px 10px',
+                      fontSize: 'var(--text-sm)',
+                      borderColor: coordError ? 'var(--color-danger, #dc2626)' : undefined,
+                    }}
+                    maxLength={100}
                     value={editCoordinatorName}
-                    onChange={(e) => setEditCoordinatorName(e.target.value)}
+                    onChange={(e) => {
+                      setEditCoordinatorName(e.target.value);
+                      if (coordError) setCoordError('');
+                    }}
                     placeholder="Coordinator full name"
                   />
+                  {coordError && (
+                    <div className="text-danger small mt-1" style={{ fontSize: '11px', lineHeight: 1.2 }}>
+                      {coordError}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <strong>{user?.ngoDetails?.coordinatorName || 'Not specified'}</strong>
@@ -294,7 +344,12 @@ export default function Profile() {
               <div style={{ maxWidth: '240px', width: '100%' }}>
                 <input
                   className="form-control"
-                  style={{ padding: '5px 10px', fontSize: 'var(--text-sm)', fontFamily: 'monospace' }}
+                  style={{
+                    padding: '5px 10px',
+                    fontSize: 'var(--text-sm)',
+                    fontFamily: 'monospace',
+                    borderColor: mobileError ? 'var(--color-danger, #dc2626)' : undefined,
+                  }}
                   maxLength={10}
                   value={editMobile}
                   onChange={(e) => handleMobileChange(e.target.value)}
@@ -321,9 +376,16 @@ export default function Profile() {
               <div style={{ maxWidth: '240px', width: '100%' }}>
                 <select
                   className="form-select"
-                  style={{ padding: '5px 10px', fontSize: 'var(--text-sm)' }}
+                  style={{
+                    padding: '5px 10px',
+                    fontSize: 'var(--text-sm)',
+                    borderColor: cityError ? 'var(--color-danger, #dc2626)' : undefined,
+                  }}
                   value={editCity}
-                  onChange={(e) => setEditCity(e.target.value)}
+                  onChange={(e) => {
+                    setEditCity(e.target.value);
+                    if (cityError) setCityError('');
+                  }}
                 >
                   <option value="">Select a city...</option>
                   {Array.from(new Set([...CITIES, ...(user?.city ? [user.city] : [])])).map((c) => (
@@ -332,6 +394,11 @@ export default function Profile() {
                     </option>
                   ))}
                 </select>
+                {cityError && (
+                  <div className="text-danger small mt-1" style={{ fontSize: '11px', lineHeight: 1.2 }}>
+                    {cityError}
+                  </div>
+                )}
               </div>
             ) : (
               <strong>{user?.city}</strong>
@@ -350,11 +417,24 @@ export default function Profile() {
                   <textarea
                     className="form-control"
                     rows="2"
-                    style={{ padding: '5px 10px', fontSize: 'var(--text-sm)' }}
+                    style={{
+                      padding: '5px 10px',
+                      fontSize: 'var(--text-sm)',
+                      borderColor: addressError ? 'var(--color-danger)' : undefined,
+                    }}
+                    maxLength={1000}
                     value={editAddress}
-                    onChange={(e) => setEditAddress(e.target.value)}
+                    onChange={(e) => {
+                      setEditAddress(e.target.value);
+                      if (addressError) setAddressError('');
+                    }}
                     placeholder="Registered NGO office address"
                   />
+                  {addressError && (
+                    <div className="text-danger small mt-1" style={{ fontSize: '11px', lineHeight: 1.2 }}>
+                      {addressError}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ textAlign: 'right', maxWidth: '300px', fontWeight: 600 }}>
@@ -364,29 +444,19 @@ export default function Profile() {
             </div>
           )}
 
-          {/* NGO Verification Status Badge (Only for NGO accounts) */}
+          {/* NGO Verification Status (Only for NGO accounts, plain black text) */}
           {isNgo && (
             <div className="detail-row">
               <span className="d-flex align-items-center gap-2">
                 <Shield size={15} color="var(--color-text-muted)" />
                 <span>Verification Status</span>
               </span>
-              <span>
-                {user?.ngoStatus === 'approved' ? (
-                  <span className="badge-verified-ngo">
-                    <BadgeCheck size={14} />
-                    <span>Verified NGO Partner</span>
-                  </span>
-                ) : user?.ngoStatus === 'pending' ? (
-                  <span className="badge-status pending d-inline-flex align-items-center gap-1">
-                    <Clock size={13} />
-                    <span>Waiting for Admin Verification</span>
-                  </span>
-                ) : (
-                  <span className="badge-status declined">
-                    <span>Application Declined</span>
-                  </span>
-                )}
+              <span style={{ color: '#000000', fontWeight: 600, fontSize: 'var(--text-base)' }}>
+                {user?.ngoStatus === 'approved'
+                  ? 'Verified NGO'
+                  : user?.ngoStatus === 'pending'
+                  ? 'Pending NGO'
+                  : 'Declined NGO'}
               </span>
             </div>
           )}
@@ -399,7 +469,7 @@ export default function Profile() {
             className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
             style={{
               color: 'var(--color-text)',
-              borderBottom: '1px solid var(--color-border)',
+              borderBottom: !isNgo ? '1px solid var(--color-border)' : undefined,
               transition: 'background var(--transition)',
             }}
           >
@@ -423,39 +493,7 @@ export default function Profile() {
             <ChevronRight size={18} color="var(--color-text-muted)" />
           </Link>
 
-          {isNgo ? (
-            /* NGO Action: Browse Available Food */
-            <Link
-              to="/feed"
-              className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
-              style={{
-                color: 'var(--color-text)',
-                transition: 'background var(--transition)',
-              }}
-            >
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: 'var(--color-primary-light)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Compass size={18} color="var(--color-primary)" />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>Browse Available Food</div>
-                  <div className="text-muted small">View surplus donations from community donors</div>
-                </div>
-              </div>
-              <ChevronRight size={18} color="var(--color-text-muted)" />
-            </Link>
-          ) : (
+          {!isNgo && (
             /* Donor Action: My Donated Food (No Post Food Donation) */
             <Link
               to="/my-donated-food"

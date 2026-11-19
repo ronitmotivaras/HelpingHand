@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
-import { validateMobile, validateName, validateAddress } from '../utils/validation';
+import { validateMobile, validateName, validateNgoName, validateAddress } from '../utils/validation';
 
 export default function NgoRegistration() {
   const { user, refreshProfile } = useAuth();
@@ -17,7 +17,7 @@ export default function NgoRegistration() {
     city: user?.city || '',
     contactNum: user?.mobile || '',
   });
-  const [phoneError, setPhoneError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   if (user?.ngoStatus === 'pending' || user?.ngoStatus === 'approved') {
@@ -53,36 +53,33 @@ export default function NgoRegistration() {
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: '' }));
+    }
   }
 
   function handlePhoneChange(val) {
     const clean = val.replace(/\D/g, '').slice(0, 10);
     update('contactNum', clean);
-    if (phoneError) setPhoneError('');
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
 
-    const nameErr = validateName(form.ngoName, 'Organization Name');
-    if (nameErr) {
-      toast.error(nameErr);
-      return;
-    }
+    const errors = {};
+    const nameErr = validateNgoName(form.ngoName, 'Organization Name');
+    if (nameErr) errors.ngoName = nameErr;
 
     const addrErr = validateAddress(form.address);
-    if (addrErr) {
-      toast.error(addrErr);
-      return;
-    }
+    if (addrErr) errors.address = addrErr;
+
+    if (!form.city.trim()) errors.city = 'Please select a city';
 
     const mError = validateMobile(form.contactNum);
-    if (mError) {
-      setPhoneError(mError);
-      return;
-    }
-    if (!form.city.trim()) {
-      toast.error('Please select a city');
+    if (mError) errors.contactNum = mError;
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -97,7 +94,18 @@ export default function NgoRegistration() {
       await refreshProfile();
       navigate('/profile');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit NGO application');
+      const msg = err.response?.data?.message || '';
+      if (/ngo|organization|name/i.test(msg)) {
+        setFieldErrors((prev) => ({ ...prev, ngoName: msg }));
+      } else if (/address/i.test(msg)) {
+        setFieldErrors((prev) => ({ ...prev, address: msg }));
+      } else if (/phone|mobile/i.test(msg)) {
+        setFieldErrors((prev) => ({ ...prev, contactNum: msg }));
+      } else if (/city/i.test(msg)) {
+        setFieldErrors((prev) => ({ ...prev, city: msg }));
+      } else {
+        toast.error(msg || 'Failed to submit NGO application');
+      }
     } finally {
       setLoading(false);
     }
@@ -124,17 +132,26 @@ export default function NgoRegistration() {
             Register your food rescue charity, community shelter, or NGO with HelpingHand.
           </p>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <div className="form-group mb-3">
               <label className="form-label" htmlFor="ngo-name">Organization / Trust Name</label>
               <input
                 id="ngo-name"
                 className="form-control"
+                style={{
+                  borderColor: fieldErrors.ngoName ? 'var(--color-danger, #dc2626)' : undefined,
+                }}
+                maxLength={100}
                 placeholder="Enter NGO name"
                 value={form.ngoName}
                 onChange={(e) => update('ngoName', e.target.value)}
-                required
               />
+              {fieldErrors.ngoName && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.ngoName}</span>
+                </div>
+              )}
             </div>
 
             <div className="form-group mb-3">
@@ -143,11 +160,20 @@ export default function NgoRegistration() {
                 id="ngo-address"
                 className="form-control"
                 rows="3"
+                style={{
+                  borderColor: fieldErrors.address ? 'var(--color-danger, #dc2626)' : undefined,
+                }}
+                maxLength={1000}
                 placeholder="Enter address"
                 value={form.address}
                 onChange={(e) => update('address', e.target.value)}
-                required
               />
+              {fieldErrors.address && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                  <AlertCircle size={13} />
+                  <span>{fieldErrors.address}</span>
+                </div>
+              )}
             </div>
 
             <div className="row g-3 mb-4">
@@ -156,9 +182,11 @@ export default function NgoRegistration() {
                 <select
                   id="ngo-city"
                   className="form-select"
+                  style={{
+                    borderColor: fieldErrors.city ? 'var(--color-danger, #dc2626)' : undefined,
+                  }}
                   value={form.city}
                   onChange={(e) => update('city', e.target.value)}
-                  required
                 >
                   <option value="">Select City...</option>
                   {cityOptions.map((c) => (
@@ -167,6 +195,12 @@ export default function NgoRegistration() {
                     </option>
                   ))}
                 </select>
+                {fieldErrors.city && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1">
+                    <AlertCircle size={13} />
+                    <span>{fieldErrors.city}</span>
+                  </div>
+                )}
               </div>
 
               <div className="col-sm-6 form-group">
@@ -174,16 +208,18 @@ export default function NgoRegistration() {
                 <input
                   id="ngo-contact"
                   className="form-control"
+                  style={{
+                    borderColor: fieldErrors.contactNum ? 'var(--color-danger, #dc2626)' : undefined,
+                  }}
                   placeholder="Enter mobile number (10 digit)"
                   value={form.contactNum}
                   onChange={(e) => handlePhoneChange(e.target.value)}
                   maxLength={10}
-                  required
                 />
-                {phoneError && (
+                {fieldErrors.contactNum && (
                   <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                     <AlertCircle size={13} />
-                    <span>{phoneError}</span>
+                    <span>{fieldErrors.contactNum}</span>
                   </div>
                 )}
               </div>

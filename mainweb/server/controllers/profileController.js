@@ -14,8 +14,21 @@ async function updateProfile(req, res) {
     if (!finalName) {
       return res.status(400).json({ message: 'Name is required' });
     }
-    if (!/^[a-zA-Z\s]+$/.test(finalName)) {
-      return res.status(400).json({ message: 'Name can only contain alphabets (a-z, A-Z) and spaces' });
+    const isNgo = Boolean(req.user.ngoStatus && req.user.ngoStatus !== 'none');
+    if (isNgo) {
+      if (finalName.length > 100 || !/^[a-zA-Z0-9\s,\-]+$/.test(finalName)) {
+        return res.status(400).json({ message: 'Only letters, numbers, commas, and hyphens allowed in NGO name' });
+      }
+    } else {
+      if (finalName.length > 100 || !/^[a-zA-Z\s]+$/.test(finalName)) {
+        return res.status(400).json({ message: 'Only alphabets allowed in name' });
+      }
+    }
+    if (coordinatorName && (String(coordinatorName).trim().length > 100 || !/^[a-zA-Z\s]+$/.test(String(coordinatorName).trim()))) {
+      return res.status(400).json({ message: 'Only alphabets allowed in coordinator name' });
+    }
+    if (address && (String(address).trim().length > 1000 || !/^[a-zA-Z0-9\s,.\-]+$/.test(String(address).trim()))) {
+      return res.status(400).json({ message: 'Only letters, numbers, commas, hyphens, and periods allowed in address' });
     }
     if (!mobile || !String(mobile).trim()) {
       return res.status(400).json({ message: 'Mobile number is required' });
@@ -26,7 +39,7 @@ async function updateProfile(req, res) {
 
     const trimmedMobile = String(mobile).trim();
     if (!/^\d{10}$/.test(trimmedMobile)) {
-      return res.status(400).json({ message: 'Mobile number must be exactly 10 digits (0-9 only)' });
+      return res.status(400).json({ message: 'Only numbers allowed (must be exactly 10 digits)' });
     }
     if (trimmedMobile !== req.user.mobile) {
       const isBlocked = await BlockedPhone.findOne({ phone: trimmedMobile });
@@ -79,8 +92,11 @@ async function changePassword(req, res) {
     if (newPassword.length < 6) {
       return res.status(400).json({ message: 'New password must be at least 6 characters' });
     }
-    if (newPassword.length > 30) {
-      return res.status(400).json({ message: 'New password must be no more than 30 characters' });
+    if (newPassword.length > 15) {
+      return res.status(400).json({ message: 'New password must be at most 15 characters' });
+    }
+    if (/\s/.test(newPassword)) {
+      return res.status(400).json({ message: 'Password cannot contain spaces' });
     }
     if (/[^a-zA-Z0-9@]/.test(newPassword)) {
       return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
@@ -105,10 +121,16 @@ async function applyNgo(req, res) {
     if (!ngoName || !address || !city || !contactNum) {
       return res.status(400).json({ message: 'All NGO fields are required' });
     }
+    if (ngoName.trim().length > 100 || !/^[a-zA-Z0-9\s,\-]+$/.test(ngoName.trim())) {
+      return res.status(400).json({ message: 'Only letters, numbers, commas, and hyphens allowed in organization name' });
+    }
+    if (address.trim().length > 1000 || !/^[a-zA-Z0-9\s,.\-]+$/.test(address.trim())) {
+      return res.status(400).json({ message: 'Only letters, numbers, commas, hyphens, and periods allowed in address' });
+    }
 
     const cleanContact = String(contactNum).trim();
     if (!/^\d{10}$/.test(cleanContact)) {
-      return res.status(400).json({ message: 'Contact number must be exactly 10 digits (0-9 only)' });
+      return res.status(400).json({ message: 'Only numbers allowed (must be exactly 10 digits)' });
     }
 
     const isBlocked = await BlockedPhone.findOne({ phone: cleanContact });

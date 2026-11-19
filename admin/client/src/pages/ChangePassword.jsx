@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import api from '../api/axiosInstance';
+import { validatePassword } from '../utils/validation';
 
 export default function ChangePassword() {
   const [form, setForm] = useState({
@@ -25,16 +26,7 @@ export default function ChangePassword() {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    const pErrors = [];
-    if (!form.newPassword || form.newPassword.length < 6) {
-      pErrors.push('Password must be at least 6 characters');
-    }
-    if (form.newPassword && form.newPassword.length > 30) {
-      pErrors.push('Password must be no more than 30 characters');
-    }
-    if (form.newPassword && /[^a-zA-Z0-9@]/.test(form.newPassword)) {
-      pErrors.push('Password can only contain letters, numbers, and @');
-    }
+    const pErrors = validatePassword(form.newPassword);
 
     let cError = '';
     if (form.newPassword !== form.confirmPassword) {
@@ -189,6 +181,7 @@ export default function ChangePassword() {
                     type={showNew ? 'text' : 'password'}
                     className="admin-form-input"
                     placeholder="Enter password"
+                    maxLength={15}
                     value={form.newPassword}
                     onChange={handleChange}
                     onPaste={(e) => e.preventDefault()}
@@ -290,6 +283,7 @@ export default function ChangePassword() {
                     type={showConfirm ? 'text' : 'password'}
                     className="admin-form-input"
                     placeholder="Re-enter new password"
+                    maxLength={15}
                     value={form.confirmPassword}
                     onChange={handleChange}
                     onPaste={(e) => e.preventDefault()}

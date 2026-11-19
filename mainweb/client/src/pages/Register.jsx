@@ -15,7 +15,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { validatePassword, validateMobile, validateName, validateAddress } from '../utils/validation';
+import { validatePassword, validateMobile, validateName, validateNgoName, validateAddress } from '../utils/validation';
 import { CITIES } from '../constants/cities';
 
 export default function Register() {
@@ -166,8 +166,17 @@ export default function Register() {
       const errorMsg = err.response?.data?.message || err.message || 'Registration failed. Please try again.';
       if (err.response?.status === 409 || errorMsg.toLowerCase().includes('already registered')) {
         setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number is already registered' }));
+      } else if (/name/i.test(errorMsg)) {
+        setFieldErrors((prev) => ({ ...prev, name: errorMsg }));
+      } else if (/mobile|phone/i.test(errorMsg)) {
+        setFieldErrors((prev) => ({ ...prev, mobile: errorMsg }));
+      } else if (/city/i.test(errorMsg)) {
+        setFieldErrors((prev) => ({ ...prev, city: errorMsg }));
+      } else if (/password/i.test(errorMsg)) {
+        setPasswordErrors([errorMsg]);
+      } else {
+        toast.error(errorMsg);
       }
-      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -179,8 +188,8 @@ export default function Register() {
 
     const errors = {};
 
-    // 1. NGO Name validation: alphabets and spaces only
-    const ngoNameErr = validateName(ngoForm.ngoName, 'NGO Name');
+    // 1. NGO Name validation: alphabets, numbers, comma, hyphen
+    const ngoNameErr = validateNgoName(ngoForm.ngoName, 'NGO Name');
     if (ngoNameErr) errors.ngoName = ngoNameErr;
 
     // 2. Mobile validation: 10 digits only
@@ -235,8 +244,21 @@ export default function Register() {
       const errorMsg = err.response?.data?.message || err.message || 'NGO Registration failed. Please try again.';
       if (err.response?.status === 409 || errorMsg.toLowerCase().includes('already registered')) {
         setFieldErrors((prev) => ({ ...prev, mobile: 'Mobile number is already registered' }));
+      } else if (/coordinator/i.test(errorMsg)) {
+        setFieldErrors((prev) => ({ ...prev, coordinatorName: errorMsg }));
+      } else if (/ngo|organization/i.test(errorMsg)) {
+        setFieldErrors((prev) => ({ ...prev, ngoName: errorMsg }));
+      } else if (/mobile|phone/i.test(errorMsg)) {
+        setFieldErrors((prev) => ({ ...prev, mobile: errorMsg }));
+      } else if (/address/i.test(errorMsg)) {
+        setFieldErrors((prev) => ({ ...prev, address: errorMsg }));
+      } else if (/city/i.test(errorMsg)) {
+        setFieldErrors((prev) => ({ ...prev, city: errorMsg }));
+      } else if (/password/i.test(errorMsg)) {
+        setPasswordErrors([errorMsg]);
+      } else {
+        toast.error(errorMsg);
       }
-      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -313,6 +335,7 @@ export default function Register() {
                     paddingLeft: '2.4rem',
                     borderColor: hasSubmitted && fieldErrors.name ? '#dc2626' : undefined,
                   }}
+                  maxLength={100}
                   placeholder="Enter name"
                   value={donatorForm.name}
                   onChange={(e) => updateDonator('name', e.target.value)}
@@ -435,7 +458,7 @@ export default function Register() {
                   onFocus={() => setPasswordFocused(true)}
                   onBlur={() => setPasswordFocused(false)}
                   onPaste={(e) => e.preventDefault()}
-                  maxLength={14}
+                  maxLength={15}
                 />
                 <button
                   type="button"
@@ -479,7 +502,7 @@ export default function Register() {
                     <li>A-Z, a-z allowed</li>
                     <li>0-9 allowed</li>
                     <li>@ allowed (no other symbols)</li>
-                    <li>Min 6 - 14 max characters</li>
+                    <li>Min 6 - 15 max characters</li>
                   </ul>
                 </div>
               )}
@@ -520,7 +543,7 @@ export default function Register() {
                   value={donatorForm.confirmPassword}
                   onChange={(e) => updateDonator('confirmPassword', e.target.value)}
                   onPaste={(e) => e.preventDefault()}
-                  maxLength={14}
+                  maxLength={15}
                 />
                 <button
                   type="button"
@@ -563,10 +586,10 @@ export default function Register() {
                 {loading ? (
                   <>
                     <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Creating Donator Account...</span>
+                    <span>Creating Account...</span>
                   </>
                 ) : (
-                  'Create Donator Account'
+                  'Create Account'
                 )}
               </button>
             </div>
@@ -599,6 +622,7 @@ export default function Register() {
                     paddingLeft: '2.4rem',
                     borderColor: hasSubmitted && fieldErrors.ngoName ? '#dc2626' : undefined,
                   }}
+                  maxLength={100}
                   placeholder="Enter NGO name"
                   value={ngoForm.ngoName}
                   onChange={(e) => updateNgo('ngoName', e.target.value)}
@@ -699,6 +723,7 @@ export default function Register() {
                 id="ngo-address"
                 className="form-control"
                 rows="2"
+                maxLength={1000}
                 placeholder="Enter address"
                 style={{
                   borderColor: hasSubmitted && fieldErrors.address ? '#dc2626' : undefined,
@@ -737,6 +762,7 @@ export default function Register() {
                     paddingLeft: '2.4rem',
                     borderColor: hasSubmitted && fieldErrors.coordinatorName ? '#dc2626' : undefined,
                   }}
+                  maxLength={100}
                   placeholder="Enter coordinator name"
                   value={ngoForm.coordinatorName}
                   onChange={(e) => updateNgo('coordinatorName', e.target.value)}
@@ -781,7 +807,7 @@ export default function Register() {
                   onFocus={() => setNgoPasswordFocused(true)}
                   onBlur={() => setNgoPasswordFocused(false)}
                   onPaste={(e) => e.preventDefault()}
-                  maxLength={14}
+                  maxLength={15}
                 />
                 <button
                   type="button"
@@ -825,7 +851,7 @@ export default function Register() {
                     <li>A-Z, a-z allowed</li>
                     <li>0-9 allowed</li>
                     <li>@ allowed (no other symbols)</li>
-                    <li>Min 6 - 14 max characters</li>
+                    <li>Min 6 - 15 max characters</li>
                   </ul>
                 </div>
               )}
@@ -867,7 +893,7 @@ export default function Register() {
                   value={ngoForm.confirmPassword}
                   onChange={(e) => updateNgo('confirmPassword', e.target.value)}
                   onPaste={(e) => e.preventDefault()}
-                  maxLength={14}
+                  maxLength={15}
                 />
                 <button
                   type="button"
@@ -910,10 +936,10 @@ export default function Register() {
                 {loading ? (
                   <>
                     <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Submitting NGO Application...</span>
+                    <span>Creating Account...</span>
                   </>
                 ) : (
-                  'Apply for NGO Verification'
+                  'Create Account'
                 )}
               </button>
             </div>

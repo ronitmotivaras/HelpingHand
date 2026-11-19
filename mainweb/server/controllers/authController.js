@@ -47,16 +47,16 @@ async function register(req, res) {
         return res.status(400).json({ message: 'All NGO fields are required' });
       }
 
-      if (!/^[a-zA-Z\s]+$/.test(finalNgoName)) {
-        return res.status(400).json({ message: 'NGO name can only contain alphabets (a-z, A-Z) and spaces' });
+      if (finalNgoName.length > 100 || !/^[a-zA-Z0-9\s,\-]+$/.test(finalNgoName)) {
+        return res.status(400).json({ message: 'Only letters, numbers, commas, and hyphens allowed in NGO name' });
       }
 
-      if (!/^[a-zA-Z\s]+$/.test(finalCoordinatorName)) {
-        return res.status(400).json({ message: 'Coordinator name can only contain alphabets (a-z, A-Z) and spaces' });
+      if (finalCoordinatorName.length > 100 || !/^[a-zA-Z\s]+$/.test(finalCoordinatorName)) {
+        return res.status(400).json({ message: 'Only alphabets allowed in coordinator name' });
       }
 
-      if (!/^[a-zA-Z0-9\s]+$/.test(finalAddress)) {
-        return res.status(400).json({ message: 'Address can only contain letters, numbers, and spaces (no symbols)' });
+      if (finalAddress.length > 1000 || !/^[a-zA-Z0-9\s,.\-]+$/.test(finalAddress)) {
+        return res.status(400).json({ message: 'Only letters, numbers, commas, hyphens, and periods allowed in address' });
       }
 
       if (!finalContactNum) {
@@ -64,7 +64,7 @@ async function register(req, res) {
       }
 
       if (!/^\d{10}$/.test(finalContactNum)) {
-        return res.status(400).json({ message: 'Contact number must be exactly 10 digits (0-9 only)' });
+        return res.status(400).json({ message: 'Only numbers allowed (must be exactly 10 digits)' });
       }
 
       if (password !== confirmPassword) {
@@ -74,8 +74,11 @@ async function register(req, res) {
       if (password.length < 6) {
         return res.status(400).json({ message: 'Password must be at least 6 characters' });
       }
-      if (password.length > 14) {
-        return res.status(400).json({ message: 'Password must be at most 14 characters' });
+      if (password.length > 15) {
+        return res.status(400).json({ message: 'Password must be at most 15 characters' });
+      }
+      if (/\s/.test(password)) {
+        return res.status(400).json({ message: 'Password cannot contain spaces' });
       }
       if (/[^a-zA-Z0-9@]/.test(password)) {
         return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
@@ -119,13 +122,13 @@ async function register(req, res) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
-      return res.status(400).json({ message: 'Full name can only contain alphabets (a-z, A-Z) and spaces' });
+    if (name.trim().length > 100 || !/^[a-zA-Z\s]+$/.test(name.trim())) {
+      return res.status(400).json({ message: 'Only alphabets allowed in name' });
     }
 
     const trimmedMobile = String(mobile).trim();
     if (!/^\d{10}$/.test(trimmedMobile)) {
-      return res.status(400).json({ message: 'Mobile number must be exactly 10 digits (0-9 only)' });
+      return res.status(400).json({ message: 'Only numbers allowed (must be exactly 10 digits)' });
     }
 
     if (password !== confirmPassword) {
@@ -135,8 +138,11 @@ async function register(req, res) {
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
-    if (password.length > 14) {
-      return res.status(400).json({ message: 'Password must be at most 14 characters' });
+    if (password.length > 15) {
+      return res.status(400).json({ message: 'Password must be at most 15 characters' });
+    }
+    if (/\s/.test(password)) {
+      return res.status(400).json({ message: 'Password cannot contain spaces' });
     }
     if (/[^a-zA-Z0-9@]/.test(password)) {
       return res.status(400).json({ message: 'Password can only contain letters, numbers, and @' });
