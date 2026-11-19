@@ -300,11 +300,11 @@ async function createDonation(req, res) {
       if (!allowedUnits.includes(it.unit)) {
         return res.status(400).json({ message: `Invalid unit "${it.unit}". Allowed: portions, kg, packets, pieces, litres` });
       }
-      if (!it.name || it.name.trim().length > 100 || !/^[a-zA-Z0-9\s,.\-@]+$/.test(it.name.trim())) {
-        return res.status(400).json({ message: `Symbols not allowed in food item name "${it.name}"` });
+      if (!it.name || !it.name.trim()) {
+        return res.status(400).json({ message: 'Food item name is required' });
       }
-      if (!/^[0-9]+(\.[0-9]+)?$/.test(it.quantity) || parseFloat(it.quantity) <= 0) {
-        return res.status(400).json({ message: `Quantity for "${it.name}" must be a positive number (numbers only)` });
+      if (!it.quantity || !it.quantity.trim()) {
+        return res.status(400).json({ message: 'Quantity is required' });
       }
     }
 
@@ -316,10 +316,6 @@ async function createDonation(req, res) {
       return res.status(400).json({ message: 'Contact person name is required' });
     }
 
-    if (contactName.trim().length > 100 || !/^[a-zA-Z\s]+$/.test(contactName.trim())) {
-      return res.status(400).json({ message: 'Only alphabets allowed in contact person name' });
-    }
-
     const cleanPhone = String(phone || '').trim();
     if (!/^\d{10}$/.test(cleanPhone)) {
       return res.status(400).json({ message: 'Only numbers allowed (must be exactly 10 digits)' });
@@ -327,10 +323,6 @@ async function createDonation(req, res) {
 
     if (!address || !address.trim()) {
       return res.status(400).json({ message: 'Pickup address is required' });
-    }
-
-    if (address.trim().length > 1000 || !/^[a-zA-Z0-9\s,.\-]+$/.test(address.trim())) {
-      return res.status(400).json({ message: 'Only letters, numbers, commas, hyphens, and periods allowed in address' });
     }
 
     const rawFrom = pickupFrom || new Date();

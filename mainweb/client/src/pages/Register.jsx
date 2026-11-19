@@ -120,18 +120,14 @@ export default function Register() {
 
     const errors = {};
 
-    // 1. Name validation: alphabets and spaces only
-    const nameErr = validateName(donatorForm.name, 'Full Name');
-    if (nameErr) errors.name = nameErr;
-
-    // 2. Mobile validation: 10 digits only
+    // 1. Mobile validation: 10 digits only
     const mError = validateMobile(donatorForm.mobile);
     if (mError) errors.mobile = mError;
 
-    // 3. City validation
+    // 2. City validation
     if (!donatorForm.city.trim()) errors.city = 'Please select your city';
 
-    // 4. Password validation: 6-14 chars, A-Za-z0-9@ only
+    // 3. Password validation: 6-15 chars, A-Za-z0-9@ only
     const pErrors = validatePassword(donatorForm.password);
 
     // 5. Confirm password
@@ -188,26 +184,14 @@ export default function Register() {
 
     const errors = {};
 
-    // 1. NGO Name validation: alphabets, numbers, comma, hyphen
-    const ngoNameErr = validateNgoName(ngoForm.ngoName, 'NGO Name');
-    if (ngoNameErr) errors.ngoName = ngoNameErr;
-
-    // 2. Mobile validation: 10 digits only
+    // 1. Mobile validation: 10 digits only
     const mError = validateMobile(ngoForm.mobile);
     if (mError) errors.mobile = mError;
 
-    // 3. City validation
+    // 2. City validation
     if (!ngoForm.city.trim()) errors.city = 'Please select NGO city';
 
-    // 4. Address validation: letters, numbers, spaces only (no symbols)
-    const addressErr = validateAddress(ngoForm.address);
-    if (addressErr) errors.address = addressErr;
-
-    // 5. Coordinator Name validation: alphabets and spaces only
-    const coordErr = validateName(ngoForm.coordinatorName, 'Coordinator Name');
-    if (coordErr) errors.coordinatorName = coordErr;
-
-    // 6. Password validation: 6-14 chars, A-Za-z0-9@ only
+    // 3. Password validation: 6-15 chars, A-Za-z0-9@ only
     const pErrors = validatePassword(ngoForm.password);
 
     // 7. Confirm password

@@ -156,41 +156,27 @@ export default function DonateFood() {
 
     const errors = {};
 
-    // 1. Contact Person Name validation (alphabets and spaces only)
-    const nErr = validateName(form.contactName, 'Contact Person');
-    if (nErr) errors.contactName = nErr;
-
-    // 2. Mobile validation (10 digits only)
+    // 1. Mobile validation (10 digits only)
     const mErr = validateMobile(form.phone);
     if (mErr) errors.phone = mErr;
 
-    // 3. City validation
+    // 2. City validation
     if (!form.city.trim()) errors.city = 'Please select a city';
 
-    // 4. Address validation (letters, numbers, spaces only)
-    const aErr = validateAddress(form.address);
-    if (aErr) errors.address = aErr;
-
-    // 5. Food Category validation (user must choose from options)
+    // 3. Food Category validation (user must choose from options)
     if (!form.foodType) errors.foodType = 'Please select a food category';
 
-    // 6. Items validation (symbols not allowed in name, numbers only in qty)
+    // 4. Items validation
     const newItemErrors = items.map((it) => {
       const err = {};
       const nameStr = (it.name || '').trim();
       if (!nameStr) {
         err.name = 'Please enter food item name';
-      } else if (nameStr.length > 100) {
-        err.name = 'Food name cannot exceed 100 characters';
-      } else if (!/^[a-zA-Z0-9\s,.\-@]+$/.test(nameStr)) {
-        err.name = 'Symbols not allowed';
       }
 
       const qStr = String(it.quantity || '').trim();
       if (!qStr) {
         err.quantity = 'Please enter quantity';
-      } else if (!/^[0-9]+(\.[0-9]+)?$/.test(qStr) || parseFloat(qStr) <= 0) {
-        err.quantity = 'Only numbers allowed';
       }
       return err;
     });

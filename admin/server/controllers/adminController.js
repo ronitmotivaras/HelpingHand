@@ -390,20 +390,8 @@ async function updateUser(req, res) {
       coordinatorPhone,
     } = req.body;
 
-    const isNgo = Boolean(user.ngoStatus && user.ngoStatus !== 'none');
-
     if (name && String(name).trim()) {
-      const cleanName = String(name).trim();
-      if (isNgo) {
-        if (cleanName.length > 100 || !/^[a-zA-Z0-9\s,\-]+$/.test(cleanName)) {
-          return res.status(400).json({ message: 'Only letters, numbers, commas, and hyphens allowed in NGO name' });
-        }
-      } else {
-        if (cleanName.length > 100 || !/^[a-zA-Z\s]+$/.test(cleanName)) {
-          return res.status(400).json({ message: 'Only alphabets allowed in name' });
-        }
-      }
-      user.name = cleanName;
+      user.name = String(name).trim();
     }
 
     if (city && String(city).trim()) {
@@ -416,25 +404,14 @@ async function updateUser(req, res) {
     if (user.ngoDetails) {
       if (ngoName && String(ngoName).trim()) {
         const cleanNgo = String(ngoName).trim();
-        if (cleanNgo.length > 100 || !/^[a-zA-Z0-9\s,\-]+$/.test(cleanNgo)) {
-          return res.status(400).json({ message: 'Only letters, numbers, commas, and hyphens allowed in NGO name' });
-        }
         user.ngoDetails.ngoName = cleanNgo;
         user.name = cleanNgo;
       }
       if (coordinatorName && String(coordinatorName).trim()) {
-        const cleanCoord = String(coordinatorName).trim();
-        if (cleanCoord.length > 100 || !/^[a-zA-Z\s]+$/.test(cleanCoord)) {
-          return res.status(400).json({ message: 'Only alphabets allowed in coordinator name' });
-        }
-        user.ngoDetails.coordinatorName = cleanCoord;
+        user.ngoDetails.coordinatorName = String(coordinatorName).trim();
       }
       if (address && String(address).trim()) {
-        const cleanAddr = String(address).trim();
-        if (cleanAddr.length > 1000 || !/^[a-zA-Z0-9\s,.\-]+$/.test(cleanAddr)) {
-          return res.status(400).json({ message: 'Only letters, numbers, commas, hyphens, and periods allowed in address' });
-        }
-        user.ngoDetails.address = cleanAddr;
+        user.ngoDetails.address = String(address).trim();
       }
       if (coordinatorPhone && String(coordinatorPhone).trim()) {
         const cleanCoord = String(coordinatorPhone).trim();

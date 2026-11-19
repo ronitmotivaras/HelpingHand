@@ -14,22 +14,6 @@ async function updateProfile(req, res) {
     if (!finalName) {
       return res.status(400).json({ message: 'Name is required' });
     }
-    const isNgo = Boolean(req.user.ngoStatus && req.user.ngoStatus !== 'none');
-    if (isNgo) {
-      if (finalName.length > 100 || !/^[a-zA-Z0-9\s,\-]+$/.test(finalName)) {
-        return res.status(400).json({ message: 'Only letters, numbers, commas, and hyphens allowed in NGO name' });
-      }
-    } else {
-      if (finalName.length > 100 || !/^[a-zA-Z\s]+$/.test(finalName)) {
-        return res.status(400).json({ message: 'Only alphabets allowed in name' });
-      }
-    }
-    if (coordinatorName && (String(coordinatorName).trim().length > 100 || !/^[a-zA-Z\s]+$/.test(String(coordinatorName).trim()))) {
-      return res.status(400).json({ message: 'Only alphabets allowed in coordinator name' });
-    }
-    if (address && (String(address).trim().length > 1000 || !/^[a-zA-Z0-9\s,.\-]+$/.test(String(address).trim()))) {
-      return res.status(400).json({ message: 'Only letters, numbers, commas, hyphens, and periods allowed in address' });
-    }
     if (!mobile || !String(mobile).trim()) {
       return res.status(400).json({ message: 'Mobile number is required' });
     }
@@ -120,12 +104,6 @@ async function applyNgo(req, res) {
     const { ngoName, address, city, contactNum } = req.body;
     if (!ngoName || !address || !city || !contactNum) {
       return res.status(400).json({ message: 'All NGO fields are required' });
-    }
-    if (ngoName.trim().length > 100 || !/^[a-zA-Z0-9\s,\-]+$/.test(ngoName.trim())) {
-      return res.status(400).json({ message: 'Only letters, numbers, commas, and hyphens allowed in organization name' });
-    }
-    if (address.trim().length > 1000 || !/^[a-zA-Z0-9\s,.\-]+$/.test(address.trim())) {
-      return res.status(400).json({ message: 'Only letters, numbers, commas, hyphens, and periods allowed in address' });
     }
 
     const cleanContact = String(contactNum).trim();

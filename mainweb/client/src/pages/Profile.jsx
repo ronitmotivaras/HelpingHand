@@ -88,24 +88,9 @@ export default function Profile() {
   async function saveEditing() {
     let hasError = false;
 
-    const nErr = isNgo
-      ? validateNgoName(editName, 'NGO Organization Name')
-      : validateName(editName, 'Full Name');
-    if (nErr) {
-      setNameError(nErr);
-      hasError = true;
-    } else {
-      setNameError('');
-    }
-
+    setNameError('');
     if (isNgo) {
-      const coordErr = validateName(editCoordinatorName, 'Coordinator Name');
-      if (coordErr) {
-        setCoordError(coordErr);
-        hasError = true;
-      } else {
-        setCoordError('');
-      }
+      setCoordError('');
     }
 
     const mErr = validateMobile(editMobile);
@@ -124,13 +109,7 @@ export default function Profile() {
     }
 
     if (isNgo) {
-      const addrErr = validateAddress(editAddress);
-      if (addrErr) {
-        setAddressError(addrErr);
-        hasError = true;
-      } else {
-        setAddressError('');
-      }
+      setAddressError('');
     }
 
     if (hasError) {

@@ -1,42 +1,12 @@
-export function validateName(name, fieldLabel = 'Full Name') {
-  if (!name || !String(name).trim()) {
-    return `Please enter ${fieldLabel.toLowerCase()}`;
-  }
-  const str = String(name).trim();
-  if (str.length > 100) {
-    return `${fieldLabel} cannot exceed 100 characters`;
-  }
-  if (!/^[a-zA-Z\s]+$/.test(str)) {
-    return 'Only alphabets allowed';
-  }
+export function validateName() {
   return '';
 }
 
-export function validateNgoName(name, fieldLabel = 'NGO Name') {
-  if (!name || !String(name).trim()) {
-    return `Please enter ${fieldLabel.toLowerCase()}`;
-  }
-  const str = String(name).trim();
-  if (str.length > 100) {
-    return `${fieldLabel} cannot exceed 100 characters`;
-  }
-  if (!/^[a-zA-Z0-9\s,\-]+$/.test(str)) {
-    return 'Only letters, numbers, commas, and hyphens allowed';
-  }
+export function validateNgoName() {
   return '';
 }
 
-export function validateAddress(address) {
-  if (!address || !String(address).trim()) {
-    return 'Please enter address';
-  }
-  const str = String(address).trim();
-  if (str.length > 1000) {
-    return 'Address cannot exceed 1000 characters';
-  }
-  if (!/^[a-zA-Z0-9\s,.\-]+$/.test(str)) {
-    return 'Only letters, numbers, commas, hyphens, and periods allowed';
-  }
+export function validateAddress() {
   return '';
 }
 
@@ -71,27 +41,10 @@ export function validateMobile(mobile) {
   return '';
 }
 
-export function validateFoodItemName(name) {
-  if (!name || !String(name).trim()) {
-    return 'Please enter food item name';
-  }
-  const str = String(name).trim();
-  if (str.length > 100) {
-    return 'Food item name cannot exceed 100 characters';
-  }
-  if (!/^[a-zA-Z0-9\s,.\-]+$/.test(str)) {
-    return 'Only letters, numbers, commas, hyphens, and periods allowed';
-  }
+export function validateFoodItemName() {
   return '';
 }
 
-export function validateQuantity(quantity) {
-  if (!quantity || !String(quantity).trim()) {
-    return 'Please enter quantity';
-  }
-  const str = String(quantity).trim();
-  if (!/^[0-9]+(\.[0-9]+)?$/.test(str) || parseFloat(str) <= 0) {
-    return 'Only numbers allowed';
-  }
+export function validateQuantity() {
   return '';
 }

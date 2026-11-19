@@ -47,18 +47,6 @@ async function register(req, res) {
         return res.status(400).json({ message: 'All NGO fields are required' });
       }
 
-      if (finalNgoName.length > 100 || !/^[a-zA-Z0-9\s,\-]+$/.test(finalNgoName)) {
-        return res.status(400).json({ message: 'Only letters, numbers, commas, and hyphens allowed in NGO name' });
-      }
-
-      if (finalCoordinatorName.length > 100 || !/^[a-zA-Z\s]+$/.test(finalCoordinatorName)) {
-        return res.status(400).json({ message: 'Only alphabets allowed in coordinator name' });
-      }
-
-      if (finalAddress.length > 1000 || !/^[a-zA-Z0-9\s,.\-]+$/.test(finalAddress)) {
-        return res.status(400).json({ message: 'Only letters, numbers, commas, hyphens, and periods allowed in address' });
-      }
-
       if (!finalContactNum) {
         return res.status(400).json({ message: 'Contact mobile number is required' });
       }
@@ -120,10 +108,6 @@ async function register(req, res) {
     // Donator registration
     if (!name || !mobile || !password || !confirmPassword || !city) {
       return res.status(400).json({ message: 'All fields are required' });
-    }
-
-    if (name.trim().length > 100 || !/^[a-zA-Z\s]+$/.test(name.trim())) {
-      return res.status(400).json({ message: 'Only alphabets allowed in name' });
     }
 
     const trimmedMobile = String(mobile).trim();

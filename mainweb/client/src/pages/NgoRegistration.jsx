@@ -67,12 +67,6 @@ export default function NgoRegistration() {
     e.preventDefault();
 
     const errors = {};
-    const nameErr = validateNgoName(form.ngoName, 'Organization Name');
-    if (nameErr) errors.ngoName = nameErr;
-
-    const addrErr = validateAddress(form.address);
-    if (addrErr) errors.address = addrErr;
-
     if (!form.city.trim()) errors.city = 'Please select a city';
 
     const mError = validateMobile(form.contactNum);
