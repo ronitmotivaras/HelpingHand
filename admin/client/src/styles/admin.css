@@ -514,7 +514,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-admin-danger {
   background: #fff;
-  color: var(--color-danger) !important;
+  color: var(--color-danger);
   border: 1.5px solid var(--color-danger-border);
   font-family: var(--font-body);
   font-size: var(--text-sm);
@@ -539,12 +539,40 @@ h1, h2, h3, h4, h5, h6 {
 .btn-admin-danger:active { transform: scale(0.97); }
 .btn-admin-danger:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
+/* Dedicated Decline Action Button (Amber/Brown with crisp white text) */
+.btn-admin-decline {
+  background: #b45309 !important;
+  color: #ffffff !important;
+  border: 1.5px solid #b45309 !important;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 9px var(--space-4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition);
+}
+
+.btn-admin-decline:hover {
+  background: #92400e !important;
+  color: #ffffff !important;
+  border-color: #92400e !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(180, 83, 9, 0.35);
+}
+
+.btn-admin-decline:active { transform: scale(0.97); }
+.btn-admin-decline:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
 /* ─── Top-Right Logout ──────────────────────────────────── */
 .btn-topright-logout {
   position: fixed;
   top: 18px;
   right: 28px;
-  z-index: 1100;
+  z-index: 50;
   display: inline-flex;
   align-items: center;
   gap: 7px;

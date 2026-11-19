@@ -5,6 +5,7 @@ const User = require('../models/User');
 const FoodDonation = require('../models/FoodDonation');
 const BlockedPhone = require('../models/BlockedPhone');
 const Request = require('../models/Request');
+const Notification = require('../models/Notification');
 const { sendNotification } = require('../utils/notify');
 
 function sanitizeUser(user) {
@@ -37,14 +38,23 @@ function sanitizeUser(user) {
 
 const getStats = async (req, res) => {
   try {
-    const totalDonators = await User.countDocuments({ ngoStatus: 'none', isBlocked: false });
+    const totalDonators = await User.countDocuments({ ngoStatus: 'none' });
     const totalUsers = totalDonators;
-    const totalNgos = await User.countDocuments({ ngoStatus: { $ne: 'none' }, isBlocked: false });
+    const totalNgos = await User.countDocuments({ ngoStatus: { $ne: 'none' } });
     const pendingNgoReviews = await User.countDocuments({ ngoStatus: 'pending', isBlocked: false });
     const verifiedNgoPartners = await User.countDocuments({ ngoStatus: 'approved', isBlocked: false });
     const totalBlocked = await User.countDocuments({ isBlocked: true });
+    const totalDonations = await FoodDonation.countDocuments();
 
-    res.json({ totalUsers, totalDonators, totalNgos, pendingNgoReviews, verifiedNgoPartners, totalBlocked });
+    res.json({
+      totalUsers,
+      totalDonators,
+      totalNgos,
+      pendingNgoReviews,
+      verifiedNgoPartners,
+      totalBlocked,
+      totalDonations,
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch stats' });
   }
@@ -76,9 +86,16 @@ async function adminLogin(req, res) {
 
 async function listNgoRequests(req, res) {
   try {
-    const { status, hasNotes } = req.query;
-    let query = { ngoStatus: { $ne: 'none' }, isBlocked: false };
-    if (status && status !== 'all') {
+    const { status, hasNotes, includeBlocked } = req.query;
+    let query = { ngoStatus: { $ne: 'none' } };
+    if (status === 'blocked') {
+      query.isBlocked = true;
+    } else if (includeBlocked === 'true' || includeBlocked === true) {
+      // include both active and blocked
+    } else {
+      query.isBlocked = false;
+    }
+    if (status && status !== 'all' && status !== 'blocked') {
       query.ngoStatus = status;
     }
     if (hasNotes === 'true') {
@@ -116,51 +133,41 @@ async function approveNgo(req, res) {
   }
 }
 
-// Case 2: Decline (Block) NGO -> Blocks NGO into shared blocklist, cancels open requests
+// Decline keeps the NGO unverified. It does not block the account or the phone number.
 async function rejectNgo(req, res) {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const reason = req.body?.reason || 'NGO verification declined / blocked by admin';
+    const reason = req.body?.reason || 'NGO verification declined by admin';
     user.ngoStatus = 'rejected';
-    user.isBlocked = true;
-    user.blockedAt = new Date();
-    user.blockedReason = reason;
+    user.isBlocked = false;
+    user.blockedAt = null;
+    user.blockedReason = '';
 
     user.adminNotes = user.adminNotes || [];
     user.adminNotes.unshift({
-      note: `Decline (Block): ${reason}`,
+      note: `Declined (not verified): ${reason}`,
       createdAt: new Date(),
     });
 
     await user.save();
 
-    // Block phone numbers in BlockedPhone collection
-    const phonesToBlock = new Set();
-    if (user.mobile && /^\d{10}$/.test(user.mobile)) phonesToBlock.add(user.mobile);
-    if (user.ngoDetails?.contactNum && /^\d{10}$/.test(user.ngoDetails.contactNum)) {
-      phonesToBlock.add(user.ngoDetails.contactNum);
-    }
-    if (user.ngoDetails?.coordinatorPhone && /^\d{10}$/.test(user.ngoDetails.coordinatorPhone)) {
-      phonesToBlock.add(user.ngoDetails.coordinatorPhone);
-    }
-    for (const phone of phonesToBlock) {
-      await BlockedPhone.findOneAndUpdate(
-        { phone },
-        { phone, reason, blockedBy: 'admin', blockedAt: new Date() },
-        { upsert: true, new: true }
-      );
-    }
-
-    // Automatically cancel all open pending requests
     await Request.updateMany({ ngoId: user._id, status: 'pending' }, { status: 'cancelled' });
     await FoodDonation.updateMany(
       { 'requests.ngoId': user._id, 'requests.status': 'pending' },
       { $set: { 'requests.$[elem].status': 'cancelled' } },
       { arrayFilters: [{ 'elem.ngoId': user._id, 'elem.status': 'pending' }] }
     );
+
+    await sendNotification({
+      userId: user._id,
+      type: 'status_changed',
+      title: 'NGO Verification Declined',
+      message: 'Your organization was not verified. You can update your details and apply again.',
+      link: '/profile',
+    });
 
     return res.json(sanitizeUser(user));
   } catch (err) {
@@ -229,8 +236,13 @@ async function addAdminNote(req, res) {
 
 async function listUsers(req, res) {
   try {
-    const { type } = req.query;
-    let query = { isBlocked: false };
+    const { type, includeBlocked } = req.query;
+    let query = {};
+    if (includeBlocked === 'true' || includeBlocked === true) {
+      // include both active and blocked
+    } else {
+      query.isBlocked = false;
+    }
     if (type === 'donator') {
       query.ngoStatus = 'none';
     } else if (type === 'ngo') {
@@ -473,38 +485,14 @@ async function deleteUser(req, res) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const shouldBlock = req.body?.blockPhone === true || req.query?.blockPhone === 'true';
-    if (shouldBlock) {
-      const phonesToBlock = new Set();
-      if (user.mobile && /^\d{10}$/.test(user.mobile)) {
-        phonesToBlock.add(user.mobile);
-      }
-      if (user.ngoDetails?.contactNum && /^\d{10}$/.test(user.ngoDetails.contactNum)) {
-        phonesToBlock.add(user.ngoDetails.contactNum);
-      }
-      if (user.ngoDetails?.coordinatorPhone && /^\d{10}$/.test(user.ngoDetails.coordinatorPhone)) {
-        phonesToBlock.add(user.ngoDetails.coordinatorPhone);
-      }
-
-      for (const phone of phonesToBlock) {
-        await BlockedPhone.findOneAndUpdate(
-          { phone },
-          {
-            phone,
-            reason: req.body?.reason || 'Confirmed fraud / blocked account',
-            blockedBy: 'admin',
-            blockedAt: new Date(),
-          },
-          { upsert: true, new: true }
-        );
-      }
+    const phones = [user.mobile, user.ngoDetails?.contactNum, user.ngoDetails?.coordinatorPhone].filter(Boolean);
+    if (phones.length > 0) {
+      await BlockedPhone.deleteMany({ phone: { $in: phones } });
     }
 
-    // Delete donations by this user
     await FoodDonation.deleteMany({ donorId: user._id });
-
-    // Clean up any requests made by this user or made for this user's donations
     await Request.deleteMany({ $or: [{ ngoId: user._id }, { donorId: user._id }] });
+    await Notification.deleteMany({ userId: user._id });
 
     await FoodDonation.updateMany(
       { 'requests.ngoId': user._id },
@@ -512,11 +500,7 @@ async function deleteUser(req, res) {
     );
 
     await user.deleteOne();
-    return res.json({
-      message: shouldBlock
-        ? 'User and associated data permanently deleted and phone number blocked from registration'
-        : 'User and all associated data permanently deleted',
-    });
+    return res.json({ message: 'User and all associated data permanently deleted' });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to delete user' });
   }

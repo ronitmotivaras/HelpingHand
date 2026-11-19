@@ -1,17 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Pencil,
   Trash2,
   Search,
   AlertTriangle,
   MapPin,
   Ban,
+  RotateCcw,
+  Eye,
+  X,
+  User,
+  Phone,
+  Calendar,
+  ShieldAlert,
+  ChevronDown,
 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
-import { validateMobile, validatePassword } from '../utils/validation';
 
 export default function UserAccounts() {
   const [users, setUsers] = useState(null);
@@ -19,29 +25,28 @@ export default function UserAccounts() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
+  const [listFilter, setListFilter] = useState('active'); // 'active' | 'blocked'
 
-  // Edit Modal State
-  const [editingUser, setEditingUser] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', mobile: '', city: '', newPassword: '' });
-  const [mobileError, setMobileError] = useState('');
-  const [passwordErrors, setPasswordErrors] = useState([]);
-  const [isSaving, setIsSaving] = useState(false);
+  // View Details Modal State
+  const [detailsUser, setDetailsUser] = useState(null);
 
   // Block Modal State
   const [blockingUser, setBlockingUser] = useState(null);
-  const [blockReason, setBlockReason] = useState('Policy violation / spam activity');
+  const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
+
+  // Unblock State
+  const [isUnblocking, setIsUnblocking] = useState(false);
 
   // Delete Confirmation Modal State
   const [deletingUser, setDeletingUser] = useState(null);
-  const [blockPhoneChecked, setBlockPhoneChecked] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   async function loadUsers() {
     setLoading(true);
     try {
       const [usersRes, statsRes] = await Promise.all([
-        api.get('/api/admin/users?type=donator'),
+        api.get('/api/admin/users?type=donator&includeBlocked=true'),
         api.get('/api/admin/stats'),
       ]);
       setUsers(usersRes.data);
@@ -58,102 +63,22 @@ export default function UserAccounts() {
     loadUsers();
   }, []);
 
-  function openEditModal(user) {
-    setEditingUser(user);
-    setEditForm({
-      name: user.name || '',
-      mobile: user.mobile || '',
-      city: user.city || '',
-      newPassword: '',
-    });
-    setMobileError('');
-    setPasswordErrors([]);
-  }
-
-  function closeEditModal() {
-    setEditingUser(null);
-    setEditForm({ name: '', mobile: '', city: '', newPassword: '' });
-    setMobileError('');
-    setPasswordErrors([]);
-  }
-
-  function handleMobileInput(val) {
-    setEditForm((prev) => ({ ...prev, mobile: val }));
-    if (/[^0-9]/.test(val)) {
-      setMobileError('Only digits (0-9) allowed. No characters, spaces, or symbols.');
-    } else if (val.length > 0 && val.length !== 10) {
-      setMobileError('Mobile number must be exactly 10 digits');
-    } else {
-      setMobileError('');
-    }
-  }
-
-  async function handleSaveEdit(e) {
-    e.preventDefault();
-    if (!editingUser) return;
-
-    // Validate mobile
-    const mErr = validateMobile(editForm.mobile);
-    if (mErr) {
-      setMobileError(mErr);
-      return;
-    }
-
-    // Validate password if provided
-    let pErrors = [];
-    if (editForm.newPassword) {
-      pErrors = validatePassword(editForm.newPassword);
-      if (pErrors.length > 0) {
-        setPasswordErrors(pErrors);
-        return;
-      }
-    }
-
-    setIsSaving(true);
-    try {
-      await api.patch(`/api/admin/users/${editingUser.id}`, {
-        name: editForm.name.trim(),
-        mobile: editForm.mobile.trim(),
-        city: editForm.city.trim(),
-        newPassword: editForm.newPassword || undefined,
-      });
-      toast.success(`Donator details updated for "${editForm.name}"`);
-      closeEditModal();
-      await loadUsers();
-    } catch (err) {
-      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
-      toast.error(err.response?.data?.message || 'Failed to update donator credentials');
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
   function openDeleteModal(user) {
     setDeletingUser(user);
-    setBlockPhoneChecked(false);
   }
 
   function closeDeleteModal() {
     setDeletingUser(null);
-    setBlockPhoneChecked(false);
   }
 
   async function handleConfirmDelete() {
     if (!deletingUser) return;
     setIsDeleting(true);
     try {
-      await api.delete(`/api/admin/users/${deletingUser.id}`, {
-        data: {
-          blockPhone: blockPhoneChecked,
-          reason: 'Fraud / fake donator account',
-        },
-      });
-      toast.success(
-        blockPhoneChecked
-          ? `Donator "${deletingUser.name}" deleted and phone blocked`
-          : `Donator "${deletingUser.name}" has been removed`
-      );
+      await api.delete(`/api/admin/users/${deletingUser.id}`);
+      toast.success(`Donator "${deletingUser.name}" and their data were permanently deleted.`);
       closeDeleteModal();
+      if (detailsUser?.id === deletingUser.id) setDetailsUser(null);
       await loadUsers();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
@@ -170,8 +95,9 @@ export default function UserAccounts() {
       await api.post(`/api/admin/users/${blockingUser.id}/block`, {
         reason: blockReason.trim() || 'Account blocked by admin',
       });
-      toast.success(`Donator "${blockingUser.name}" has been blocked and moved to the blocklist`);
+      toast.success(`Donator "${blockingUser.name}" has been blocked.`);
       setBlockingUser(null);
+      if (detailsUser?.id === blockingUser.id) setDetailsUser(null);
       await loadUsers();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
@@ -181,12 +107,34 @@ export default function UserAccounts() {
     }
   }
 
+  async function handleUnblockUser(user) {
+    setIsUnblocking(true);
+    try {
+      await api.post(`/api/admin/users/${user.id}/unblock`);
+      toast.success(`Donator "${user.name}" unblocked and account restored.`);
+      if (detailsUser?.id === user.id) setDetailsUser(null);
+      await loadUsers();
+    } catch (err) {
+      if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
+      toast.error(err.response?.data?.message || 'Failed to unblock donator');
+    } finally {
+      setIsUnblocking(false);
+    }
+  }
+
+  const activeDonators = (users || []).filter((u) => !u.isBlocked);
+  const blockedDonators = (users || []).filter((u) => u.isBlocked);
+
   const filteredUsers = (users || []).filter((u) => {
+    if (listFilter === 'active' && u.isBlocked) return false;
+    if (listFilter === 'blocked' && !u.isBlocked) return false;
+
     const term = search.toLowerCase();
     const matchesSearch =
       u.name?.toLowerCase().includes(term) ||
       u.mobile?.toLowerCase().includes(term) ||
-      u.city?.toLowerCase().includes(term);
+      u.city?.toLowerCase().includes(term) ||
+      u.blockedReason?.toLowerCase().includes(term);
 
     const matchesCity = !selectedCity || u.city?.toLowerCase() === selectedCity.toLowerCase();
     return matchesSearch && matchesCity;
@@ -194,11 +142,7 @@ export default function UserAccounts() {
 
   return (
     <div className="admin-layout">
-      <AdminSidebar
-        pendingCount={stats?.pendingNgoReviews}
-        usersCount={stats?.totalDonators ?? (users ? users.length : undefined)}
-        blockedCount={stats?.totalBlocked}
-      />
+      <AdminSidebar />
 
       <main className="admin-main">
         <div className="admin-breadcrumb-bar">
@@ -208,7 +152,49 @@ export default function UserAccounts() {
         </div>
 
         <section className="admin-card-panel">
-          <div className="d-flex justify-content-between align-items-center flex-wrap gap-3" style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)' }}>
+          {/* Top Filter Tabs: Active Donators / Blocked */}
+          <div
+            className="d-flex justify-content-between align-items-center flex-wrap gap-3"
+            style={{
+              padding: 'var(--space-4) var(--space-5)',
+              borderBottom: '1px solid var(--color-border-subtle)',
+              background: 'var(--color-surface-2)',
+            }}
+          >
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                className={`btn-admin-outline ${listFilter === 'active' ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
+                onClick={() => setListFilter('active')}
+              >
+                Donators
+              </button>
+
+              <button
+                type="button"
+                className={`btn-admin-outline ${listFilter === 'blocked' ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: 'var(--text-sm)', fontWeight: 600 }}
+                onClick={() => setListFilter('blocked')}
+                title="Blocked Donator Accounts"
+              >
+                <Ban size={14} className="me-1" />
+                <span>Blocked</span>
+              </button>
+            </div>
+
+            {/* Showing Count at top right */}
+            <span className="text-muted" style={{ fontSize: 'var(--text-small)', whiteSpace: 'nowrap' }}>
+              Showing <strong>{filteredUsers.length}</strong> of{' '}
+              {listFilter === 'active' ? activeDonators.length : blockedDonators.length} donators
+            </span>
+          </div>
+
+          {/* Search & City Filter Bar */}
+          <div
+            className="d-flex justify-content-between align-items-center flex-wrap gap-3"
+            style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)' }}
+          >
             <div className="d-flex align-items-center gap-3 flex-wrap">
               <div style={{ position: 'relative', width: '300px', maxWidth: '100%' }}>
                 <Search
@@ -226,13 +212,19 @@ export default function UserAccounts() {
                 />
               </div>
 
-              {/* City Filter Dropdown */}
-              <div style={{ width: '170px' }}>
+              {/* City Filter Dropdown with visible arrow */}
+              <div style={{ position: 'relative', width: '170px' }}>
                 <select
                   className="admin-form-input"
                   value={selectedCity}
                   onChange={(e) => setSelectedCity(e.target.value)}
-                  style={{ cursor: 'pointer' }}
+                  style={{
+                    cursor: 'pointer',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    paddingRight: '34px',
+                  }}
                 >
                   <option value="">All Cities</option>
                   {CITIES.map((c) => (
@@ -241,12 +233,19 @@ export default function UserAccounts() {
                     </option>
                   ))}
                 </select>
+                <ChevronDown
+                  size={16}
+                  color="var(--color-text-muted)"
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                  }}
+                />
               </div>
             </div>
-
-            <span className="text-muted" style={{ fontSize: 'var(--text-small)', whiteSpace: 'nowrap' }}>
-              Showing <strong>{filteredUsers.length}</strong> of {users ? users.length : 0} donators
-            </span>
           </div>
 
           {loading && users === null ? (
@@ -265,64 +264,109 @@ export default function UserAccounts() {
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Mobile</th>
+                    <th style={{ width: '60px' }}>#</th>
+                    <th>Donator Name</th>
                     <th>City</th>
+                    <th>Phone Number</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="text-center py-4 text-muted">
-                        No matching donator accounts found.
+                      <td colSpan="5" className="text-center py-4 text-muted">
+                        {listFilter === 'blocked'
+                          ? 'No blocked donator accounts found.'
+                          : 'No matching donator accounts found.'}
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((user) => (
+                    filteredUsers.map((user, index) => (
                       <tr key={user.id}>
-                        <td>
-                          <strong>{user.name}</strong>
-                          <div className="text-muted small">
-                            Joined {new Date(user.createdAt || Date.now()).toLocaleDateString([], { dateStyle: 'medium' })}
-                          </div>
+                        {/* Index Number */}
+                        <td className="fw-bold" style={{ fontFamily: 'monospace', color: '#111827' }}>
+                          {index + 1}
                         </td>
+
+                        {/* Donator Name (solid black) */}
                         <td>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{user.mobile}</span>
+                          <strong style={{ fontSize: '15px', color: '#111827' }}>{user.name}</strong>
                         </td>
+
+                        {/* City (solid black) */}
                         <td>
-                          <span className="d-inline-flex align-items-center gap-1">
-                            <MapPin size={13} color="var(--color-text-muted)" />
+                          <span className="d-inline-flex align-items-center gap-1" style={{ color: '#111827' }}>
+                            <MapPin size={13} color="#111827" />
                             {user.city}
                           </span>
                         </td>
+
+                        {/* Phone Number (solid black) */}
+                        <td>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#111827' }}>{user.mobile}</span>
+                        </td>
+
+                        {/* Actions */}
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '8px' }}>
-                            <button
-                              className="btn-admin-outline d-inline-flex align-items-center gap-1"
-                              onClick={() => openEditModal(user)}
-                              title="Edit user credentials"
-                            >
-                              <Pencil size={14} />
-                              <span>Edit</span>
-                            </button>
+                            {/* View Details Button */}
                             <button
                               type="button"
                               className="btn-admin-outline d-inline-flex align-items-center gap-1"
-                              style={{ color: '#b91c1c', borderColor: '#fca5a5' }}
-                              onClick={() => {
-                                setBlockingUser(user);
-                                setBlockReason('Policy violation / spam activity');
-                              }}
-                              title="Block this donor account and move to blocklist"
+                              style={{ padding: '5px 11px', fontSize: 'var(--text-sm)', color: '#2563eb', borderColor: '#bfdbfe' }}
+                              onClick={() => setDetailsUser(user)}
+                              title="View donator details"
                             >
-                              <Ban size={14} />
-                              <span>Block</span>
+                              <Eye size={14} />
+                              <span>Details</span>
                             </button>
+
+                            {/* Block or Unblock Button */}
+                            {user.isBlocked ? (
+                              <button
+                                type="button"
+                                className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                                style={{
+                                  padding: '5px 11px',
+                                  fontSize: 'var(--text-sm)',
+                                  color: 'var(--color-primary)',
+                                  borderColor: 'rgba(26, 122, 46, 0.3)',
+                                }}
+                                disabled={isUnblocking}
+                                onClick={() => handleUnblockUser(user)}
+                                title="Unblock donator and restore account access"
+                              >
+                                <RotateCcw size={14} />
+                                <span>Unblock</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn-admin-outline d-inline-flex align-items-center gap-1"
+                                style={{
+                                  padding: '5px 11px',
+                                  fontSize: 'var(--text-sm)',
+                                  color: '#b91c1c',
+                                  borderColor: '#fca5a5',
+                                }}
+                                onClick={() => {
+                                  setBlockingUser(user);
+                                  setBlockReason('');
+                                }}
+                                title="Block this donor account"
+                              >
+                                <Ban size={14} />
+                                <span>Block</span>
+                              </button>
+                            )}
+
+                            {/* Delete Button */}
                             <button
+                              type="button"
                               className="btn-admin-danger d-inline-flex align-items-center gap-1"
+                              style={{ padding: '5px 11px', fontSize: 'var(--text-sm)' }}
                               onClick={() => openDeleteModal(user)}
-                              title="Delete user"
+                              title="Permanently delete user and data from database"
                             >
                               <Trash2 size={14} />
                               <span>Delete</span>
@@ -338,149 +382,111 @@ export default function UserAccounts() {
           )}
         </section>
 
-        {/* Edit User Modal */}
-        {editingUser && (
+        {/* View Details Modal */}
+        {detailsUser && (
           <div
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.45)',
+              background: 'rgba(0, 0, 0, 0.5)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 1050,
+              zIndex: 2000,
               padding: '16px',
             }}
-            onClick={closeEditModal}
+            onClick={() => setDetailsUser(null)}
           >
             <div
-              className="admin-edit-box"
               style={{
                 maxWidth: '480px',
                 width: '100%',
                 background: 'var(--color-surface)',
-                boxShadow: 'var(--shadow-lg)',
+                boxShadow: 'var(--shadow-xl)',
                 borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-6)',
+                padding: '28px',
+                border: '1px solid var(--color-border)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="d-flex align-items-center gap-2 mb-1">
-                <Pencil size={18} color="var(--color-primary)" />
-                <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
-                  Edit Donator Details
-                </h3>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div className="d-flex align-items-center gap-2">
+                  <User size={20} color="var(--color-primary)" />
+                  <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                    Donator Account Details
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailsUser(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <p className="text-muted small mb-4">Editing account for {editingUser.name}</p>
 
-              <form onSubmit={handleSaveEdit}>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="edit-name">
-                    Full Name
-                  </label>
-                  <input
-                    id="edit-name"
-                    type="text"
-                    className="admin-form-input"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="edit-mobile">
-                    Mobile Number
-                  </label>
-                  <input
-                    id="edit-mobile"
-                    type="text"
-                    className="admin-form-input"
-                    value={editForm.mobile}
-                    onChange={(e) => handleMobileInput(e.target.value)}
-                    placeholder="10-digit mobile number"
-                    required
-                  />
-                  {mobileError && (
-                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                      <AlertTriangle size={13} />
-                      <span>{mobileError}</span>
+              <div className="d-flex flex-column gap-3 mb-4">
+                <div className="p-3 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}>
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <div className="text-muted small">Full Name</div>
+                      <div className="fw-semibold">{detailsUser.name}</div>
                     </div>
-                  )}
+                    <div className="col-6">
+                      <div className="text-muted small">Mobile Number</div>
+                      <div className="fw-semibold font-monospace">{detailsUser.mobile}</div>
+                    </div>
+                    <div className="col-6 mt-2">
+                      <div className="text-muted small">City</div>
+                      <div className="fw-semibold">{detailsUser.city || '—'}</div>
+                    </div>
+                    <div className="col-6 mt-2">
+                      <div className="text-muted small">Registered Date</div>
+                      <div className="small">
+                        {detailsUser.createdAt
+                          ? new Date(detailsUser.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+                          : '—'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="edit-city">
-                    City
-                  </label>
-                  <select
-                    id="edit-city"
-                    className="admin-form-input"
-                    value={editForm.city}
-                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                    required
+                {/* If Blocked: show blocked reason and blockedAt */}
+                {detailsUser.isBlocked && (
+                  <div
+                    className="p-3 rounded"
+                    style={{ background: '#fef2f2', border: '1px solid #fecaca', fontSize: 'var(--text-sm)', color: '#991b1b' }}
                   >
-                    <option value="">Select City...</option>
-                    {Array.from(new Set([...CITIES, editForm.city].filter(Boolean))).map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="mb-4">
-                  <label className="form-label" htmlFor="edit-new-pass">
-                    New Password <span className="text-muted fw-normal">(leave blank to keep current)</span>
-                  </label>
-                  <input
-                    id="edit-new-pass"
-                    type="password"
-                    className="admin-form-input"
-                    placeholder="Enter 6-30 characters (letters, numbers, @)..."
-                    value={editForm.newPassword}
-                    onChange={(e) => {
-                      setEditForm({ ...editForm, newPassword: e.target.value });
-                      setPasswordErrors([]);
-                    }}
-                    onPaste={(e) => e.preventDefault()}
-                  />
-                  {passwordErrors.length > 0 && (
-                    <div className="mt-1 d-flex flex-column gap-1">
-                      {passwordErrors.map((err, idx) => (
-                        <span key={idx} className="text-danger small d-flex align-items-center gap-1">
-                          <AlertTriangle size={12} />
-                          {err}
-                        </span>
-                      ))}
+                    <div className="d-flex align-items-center gap-1 fw-semibold mb-1">
+                      <ShieldAlert size={15} />
+                      <span>Block Details</span>
                     </div>
-                  )}
-                </div>
-
-                <div className="d-flex justify-content-end gap-2">
-                  <button type="button" className="btn-admin-outline" onClick={closeEditModal} disabled={isSaving}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn-admin-primary" disabled={isSaving}>
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
+                    <div>
+                      <strong>Reason:</strong> {detailsUser.blockedReason || 'Policy violation / spam activity'}
+                    </div>
+                    {detailsUser.blockedAt && (
+                      <div className="small text-muted mt-1">
+                        Blocked on {new Date(detailsUser.blockedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* Delete Confirmation Modal */}
+        {/* Delete Confirmation Modal - Pure delete */}
         {deletingUser && (
           <div
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.45)',
+              background: 'rgba(0, 0, 0, 0.5)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 1050,
+              zIndex: 2000,
               padding: '16px',
             }}
             onClick={closeDeleteModal}
@@ -504,33 +510,8 @@ export default function UserAccounts() {
                 </h3>
               </div>
               <p className="text-muted mb-3" style={{ fontSize: '14px', lineHeight: 1.5 }}>
-                Are you sure you want to delete donator <strong>"{deletingUser.name}"</strong>? This will remove all their profile data and associated food donation listings. <strong>This action cannot be undone.</strong>
+                Are you sure you want to delete donator <strong>&quot;{deletingUser.name}&quot;</strong>?
               </p>
-
-              <div
-                className="p-3 mb-4 rounded"
-                style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                }}
-              >
-                <label className="d-flex align-items-start gap-2 cursor-pointer m-0" style={{ cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={blockPhoneChecked}
-                    onChange={(e) => setBlockPhoneChecked(e.target.checked)}
-                    style={{ marginTop: '3px', width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  <div>
-                    <strong style={{ color: '#991b1b', fontSize: '13px' }}>
-                      Also block this phone number ({deletingUser.mobile})
-                    </strong>
-                    <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
-                      Check this if this account is fraudulent to stop future registrations.
-                    </div>
-                  </div>
-                </label>
-              </div>
 
               <div className="d-flex justify-content-end gap-2">
                 <button type="button" className="btn-admin-outline" onClick={closeDeleteModal} disabled={isDeleting}>
@@ -542,7 +523,7 @@ export default function UserAccounts() {
                   onClick={handleConfirmDelete}
                   disabled={isDeleting}
                 >
-                  {isDeleting ? 'Deleting...' : 'Yes, Delete Account'}
+                  {isDeleting ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </div>
@@ -555,11 +536,11 @@ export default function UserAccounts() {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.45)',
+              background: 'rgba(0, 0, 0, 0.5)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 1050,
+              zIndex: 2000,
               padding: '16px',
             }}
             onClick={() => !isBlocking && setBlockingUser(null)}
@@ -584,25 +565,8 @@ export default function UserAccounts() {
               </div>
 
               <p className="text-muted mb-3" style={{ fontSize: '14px', lineHeight: 1.5 }}>
-                Are you sure you want to block <strong>"{blockingUser.name}"</strong> ({blockingUser.mobile})?
+                Are you sure you want to block <strong>&quot;{blockingUser.name}&quot;</strong> ({blockingUser.mobile})?
               </p>
-
-              <div
-                className="p-3 mb-3 rounded"
-                style={{
-                  background: 'var(--color-danger-bg)',
-                  border: '1px solid var(--color-danger-border)',
-                  fontSize: 'var(--text-sm)',
-                  color: '#991b1b',
-                }}
-              >
-                <ul className="mb-0 ps-3">
-                  <li>Active sessions are terminated immediately</li>
-                  <li>Login attempt will show: <em>"Your account has been blocked by admin. Please contact support."</em></li>
-                  <li>Phone number cannot be used to register again</li>
-                  <li>Listings are hidden from the platform until unblocked or deleted</li>
-                </ul>
-              </div>
 
               <div className="mb-4">
                 <label className="form-label" htmlFor="block-reason" style={{ fontSize: '13px', fontWeight: 600 }}>
@@ -614,8 +578,7 @@ export default function UserAccounts() {
                   className="admin-form-input"
                   value={blockReason}
                   onChange={(e) => setBlockReason(e.target.value)}
-                  placeholder="e.g. Inappropriate behavior, spam listings, no show..."
-                  required
+                  placeholder="Reason for block (optional)..."
                 />
               </div>
 

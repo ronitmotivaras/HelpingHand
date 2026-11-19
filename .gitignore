@@ -1,4 +1,11 @@
 node_modules/
 .env
 client/build/
-start.bat
+start.bat
+
+# Run commands & local documentation
+run-commands*
+run_commands*
+run commands*
+RUN_COMMANDS*
+

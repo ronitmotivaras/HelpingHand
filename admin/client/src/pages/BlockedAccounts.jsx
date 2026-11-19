@@ -123,11 +123,7 @@ export default function BlockedAccounts() {
 
   return (
     <div className="admin-layout">
-      <AdminSidebar
-        pendingCount={stats?.pendingNgoReviews}
-        usersCount={stats?.totalDonators}
-        blockedCount={stats?.totalBlocked}
-      />
+      <AdminSidebar />
 
       <main className="admin-main">
         {/* Header */}
@@ -425,11 +421,11 @@ export default function BlockedAccounts() {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.45)',
+              background: 'rgba(0, 0, 0, 0.5)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 1050,
+              zIndex: 2000,
               padding: '16px',
             }}
             onClick={() => !isUnblocking && setUnblockingUser(null)}
@@ -515,11 +511,11 @@ export default function BlockedAccounts() {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.45)',
+              background: 'rgba(0, 0, 0, 0.5)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 1050,
+              zIndex: 2000,
               padding: '16px',
             }}
             onClick={() => !isDeleting && setDeletingUser(null)}
@@ -537,32 +533,15 @@ export default function BlockedAccounts() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="d-flex align-items-center gap-2 mb-2">
-                <AlertTriangle size={22} color="var(--color-danger)" />
+                <Trash2 size={22} color="var(--color-danger)" />
                 <h3 className="card-title m-0" style={{ fontSize: '18px', color: 'var(--color-danger)' }}>
-                  Delete All Data Permanently
+                  Delete Account
                 </h3>
               </div>
 
-              <p className="text-muted mb-3" style={{ fontSize: 'var(--text-sm)' }}>
-                This is an irreversible action. You are about to permanently delete:
+              <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to delete <strong>&quot;{deletingUser.name}&quot;</strong>?
               </p>
-
-              <div
-                className="p-3 rounded mb-3"
-                style={{
-                  background: 'var(--color-danger-bg)',
-                  border: '1px solid var(--color-danger-border)',
-                  fontSize: 'var(--text-sm)',
-                  color: '#991b1b',
-                }}
-              >
-                <ul className="mb-0 ps-3">
-                  <li>User account ({deletingUser.name} &bull; {deletingUser.mobile})</li>
-                  <li>All surplus food listings created by this account</li>
-                  <li>All pickup requests created by or directed to this account</li>
-                  <li>The phone number remains locked on the blocklist to prevent re-registration</li>
-                </ul>
-              </div>
 
               <div className="d-flex justify-content-end gap-2">
                 <button
@@ -580,7 +559,7 @@ export default function BlockedAccounts() {
                   onClick={confirmDeleteAll}
                 >
                   <Trash2 size={15} />
-                  <span>{isDeleting ? 'Deleting data...' : 'Delete All Data'}</span>
+                  <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
                 </button>
               </div>
             </div>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Leaf, LayoutDashboard, BadgeCheck, Users, LogOut, KeyRound, Menu, X, Ban } from 'lucide-react';
+import { Leaf, LayoutDashboard, BadgeCheck, Users, LogOut, KeyRound, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export default function AdminSidebar({ pendingCount, usersCount, blockedCount }) {
+export default function AdminSidebar() {
   const { adminLogout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -105,10 +105,7 @@ export default function AdminSidebar({ pendingCount, usersCount, blockedCount })
                 <span className="nav-icon">
                   <BadgeCheck size={16} strokeWidth={2} />
                 </span>
-                <span className="nav-label">NGO List</span>
-                {typeof pendingCount === 'number' && pendingCount > 0 && (
-                  <span className="nav-count-badge">{pendingCount}</span>
-                )}
+                <span className="nav-label">NGOs</span>
               </button>
             </li>
             <li>
@@ -123,33 +120,9 @@ export default function AdminSidebar({ pendingCount, usersCount, blockedCount })
                   <Users size={16} strokeWidth={2} />
                 </span>
                 <span className="nav-label">Donators</span>
-                {typeof usersCount === 'number' && usersCount > 0 && (
-                  <span className="nav-count-badge">{usersCount}</span>
-                )}
               </button>
             </li>
-            <li>
-              <button
-                className={`admin-nav-link ${currentPath === '/blocked' || currentPath === '/blocked-accounts' ? 'active' : ''}`}
-                onClick={() => {
-                  navigate('/blocked');
-                  setMobileOpen(false);
-                }}
-              >
-                <span className="nav-icon">
-                  <Ban size={16} strokeWidth={2} />
-                </span>
-                <span className="nav-label">Blocked Accounts</span>
-                {typeof blockedCount === 'number' && blockedCount > 0 && (
-                  <span
-                    className="nav-count-badge"
-                    style={{ background: 'var(--color-danger, #ef4444)', color: '#fff' }}
-                  >
-                    {blockedCount}
-                  </span>
-                )}
-              </button>
-            </li>
+
             <li>
               <button
                 className={`admin-nav-link ${currentPath === '/change-password' ? 'active' : ''}`}
