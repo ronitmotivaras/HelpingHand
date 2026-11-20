@@ -33,7 +33,7 @@ function getStatusBadge(status, expired = false) {
     return <span className="badge-status pickedUp">Picked Up</span>;
   }
   if (status === 'expired' || expired) {
-    return <span className="badge-status expired">Expired</span>;
+    return <span className="badge-status expired">Not Accepted</span>;
   }
   if (status === 'accepted' || status === 'booked') {
     return <span className="badge-status accepted">Accepted</span>;
@@ -78,20 +78,25 @@ export default function DonorDashboard() {
     }
   }
 
-  async function loadListings() {
-    setLoading(true);
+  async function loadListings(isBackground = false) {
+    if (!isBackground) setLoading(true);
     try {
       const { data } = await api.get('/food/mine');
       setListings(data);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load your listings');
+      if (!isBackground) toast.error(err.response?.data?.message || 'Failed to load your listings');
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   }
 
   useEffect(() => {
     loadListings();
+    // Live update donor dashboard every 5 seconds so incoming requests, status changes update automatically
+    const interval = setInterval(() => {
+      loadListings(true);
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Show only active food listings on the donor dashboard
@@ -105,7 +110,7 @@ export default function DonorDashboard() {
     setProcessingId(requestId || listingId);
     try {
       await api.post(`/food/${listingId}/requests/${requestId}/accept`);
-      toast.success(`Request accepted! Food is now reserved for ${ngoName || 'the NGO'}. Other requests have been closed.`);
+      toast.success(`Request accepted! Food is now reserved for ${ngoName || 'the NGO'}.`);
       await loadListings();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to accept request');
@@ -256,36 +261,44 @@ export default function DonorDashboard() {
                     </div>
                   </div>
 
-                  {/* Multiple items pills */}
+                  {/* Multiple items pills (only show if not just repeating the exact single food title) */}
                   {listing.items && listing.items.length > 0 && (
-                    <div className="d-flex flex-wrap gap-2 mb-3">
-                      {listing.items.map((it, idx) => (
-                        <span className="item-chip" key={idx}>
-                          <Package size={12} color="var(--color-primary)" />
-                          <strong>{it.quantity} {it.unit}</strong> {it.name}
-                        </span>
-                      ))}
-                    </div>
+                    (() => {
+                      const displayItems =
+                        listing.items.length === 1 &&
+                        listing.foodName?.toLowerCase().trim() === listing.items[0].name?.toLowerCase().trim()
+                          ? []
+                          : listing.items;
+
+                      return displayItems.length > 0 ? (
+                        <div className="d-flex flex-wrap gap-2 mb-3">
+                          {displayItems.map((it, idx) => (
+                            <span className="item-chip" key={idx}>
+                              <Package size={12} color="var(--color-primary)" />
+                              <strong>{it.quantity} {it.unit}</strong> {it.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()
                   )}
 
                   {/* Pickup timing row */}
                   <div
-                    className="mb-3 py-2 px-3 rounded"
+                    className="mb-3 py-2 px-3 rounded d-flex align-items-center gap-2 flex-wrap"
                     style={{
                       background: 'var(--color-surface-2, #f9fafb)',
                       border: '1px solid var(--color-border-subtle, #e5e7eb)',
                       fontSize: 'var(--text-sm)',
                     }}
                   >
-                    <div className="d-flex align-items-center gap-2 flex-wrap">
-                      <span className="text-muted d-flex align-items-center gap-1">
-                        <Calendar size={14} color="var(--color-primary)" />
-                        <strong>Pickup Window:</strong>
-                      </span>
-                      <span className="fw-semibold text-dark">
-                        {formatDate(listing.pickupFrom)} — {formatDate(listing.pickupTo)}
-                      </span>
-                    </div>
+                    <span className="text-muted d-flex align-items-center gap-1">
+                      <Calendar size={14} color="var(--color-primary)" />
+                      <strong>Pickup Window:</strong>
+                    </span>
+                    <span className="fw-semibold text-dark">
+                      {formatDate(listing.pickupFrom)} — {formatDate(listing.pickupTo)}
+                    </span>
                   </div>
 
                   {/* CASE 0: EXPIRED (not picked up) - Informative alert */}
@@ -424,97 +437,116 @@ export default function DonorDashboard() {
 
                   {/* CASE 2: ACCEPTED - Show accepted NGO, Picked Up, and Release */}
                   {isAccepted && (
-                    <div
-                      className="p-3 rounded mt-2"
-                      style={{
-                        background: '#fffbeb',
-                        border: '1px solid #fde68a',
-                      }}
-                    >
-                      <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-                        <div>
-                          <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
-                            <span className="badge-status accepted" style={{ padding: '2px 8px', fontSize: '11px' }}>
-                              Accepted
-                            </span>
-                            <strong style={{ fontSize: 'var(--text-base)', color: '#92400e' }}>
-                              {acceptedNgo?.ngoName || 'NGO'}
-                            </strong>
-                            <span className="badge-verified-ngo">
-                              <BadgeCheck size={13} />
-                              <span>Verified NGO</span>
-                            </span>
-                            {acceptedNgo?.ngoId && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenNgoProfile(listing.id, acceptedNgo.ngoId)}
-                                className="btn-hh-secondary d-inline-flex align-items-center gap-1"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '2px 8px',
-                                  borderRadius: '12px',
-                                  background: '#fef3c7',
-                                  borderColor: '#fde68a',
-                                  color: '#92400e',
-                                }}
-                              >
-                                <Eye size={11} />
-                                <span>View Profile</span>
-                              </button>
-                            )}
+                    <div className="mt-2 d-flex flex-column gap-3">
+                      <div
+                        className="p-3 rounded"
+                        style={{
+                          background: '#fffbeb',
+                          border: '1px solid #fde68a',
+                        }}
+                      >
+                        <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                          <div>
+                            <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                              <span className="badge-status accepted" style={{ padding: '2px 8px', fontSize: '11px' }}>
+                                Accepted
+                              </span>
+                              <strong style={{ fontSize: 'var(--text-base)', color: '#92400e' }}>
+                                {acceptedNgo?.ngoName || 'NGO'}
+                              </strong>
+                              <span className="badge-verified-ngo">
+                                <BadgeCheck size={13} />
+                                <span>Verified NGO</span>
+                              </span>
+                              {acceptedNgo?.ngoId && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenNgoProfile(listing.id, acceptedNgo.ngoId)}
+                                  className="btn-hh-secondary d-inline-flex align-items-center gap-1"
+                                  style={{
+                                    fontSize: '11px',
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                    background: '#fef3c7',
+                                    borderColor: '#fde68a',
+                                    color: '#92400e',
+                                  }}
+                                >
+                                  <Eye size={11} />
+                                  <span>View Profile</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="d-flex align-items-center gap-3 text-muted flex-wrap" style={{ fontSize: 'var(--text-sm)' }}>
+                              {acceptedNgo?.coordinatorName && (
+                                <span>
+                                  Coordinator: <strong>{acceptedNgo.coordinatorName}</strong>
+                                </span>
+                              )}
+                              {acceptedNgo?.phone && (
+                                <a
+                                  href={`tel:${acceptedNgo.phone}`}
+                                  className="phone-link-btn"
+                                  title="Call NGO"
+                                >
+                                  <Phone size={13} />
+                                  <span>{acceptedNgo.phone}</span>
+                                </a>
+                              )}
+                              {(acceptedNgo?.acceptedAt || listing.bookedAt) && (
+                                <span style={{ fontSize: '11px', color: '#92400e', fontWeight: 600 }}>
+                                  Accepted At: {formatDate(acceptedNgo?.acceptedAt || listing.bookedAt)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="small text-muted mt-1">
+                              Once collected, click Picked Up. If this NGO cannot come, click Release to view and accept other requests in the queue.
+                            </div>
                           </div>
 
-                          <div className="d-flex align-items-center gap-3 text-muted flex-wrap" style={{ fontSize: 'var(--text-sm)' }}>
-                            {acceptedNgo?.coordinatorName && (
-                              <span>
-                                Coordinator: <strong>{acceptedNgo.coordinatorName}</strong>
-                              </span>
-                            )}
-                            {acceptedNgo?.phone && (
-                              <a
-                                href={`tel:${acceptedNgo.phone}`}
-                                className="phone-link-btn"
-                                title="Call NGO"
-                              >
-                                <Phone size={13} />
-                                <span>{acceptedNgo.phone}</span>
-                              </a>
-                            )}
-                            {acceptedNgo?.acceptedAt && (
-                              <span style={{ fontSize: '11px' }}>
-                                Accepted {formatDate(acceptedNgo.acceptedAt)}
-                              </span>
-                            )}
+                          <div className="d-flex gap-2">
+                            <button
+                              type="button"
+                              className="btn-hh-primary d-inline-flex align-items-center gap-1"
+                              style={{ padding: '7px 16px', fontSize: 'var(--text-sm)' }}
+                              disabled={isBusy}
+                              onClick={() => handlePickedUp(listing.id)}
+                            >
+                              <CheckCircle2 size={16} />
+                              <span>{isBusy ? 'Saving...' : 'Picked Up'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-hh-secondary d-inline-flex align-items-center gap-1"
+                              style={{ padding: '7px 14px', fontSize: 'var(--text-sm)' }}
+                              disabled={isBusy}
+                              onClick={() => handleRelease(listing.id)}
+                              title="If this NGO cannot come, cancel acceptance and release back"
+                            >
+                              <RotateCcw size={15} />
+                              <span>Release</span>
+                            </button>
                           </div>
-                          <div className="small text-muted mt-1">
-                            Once collected, click Picked Up. If the NGO cannot come, click Release to make food available in the feed again.
-                          </div>
-                        </div>
-
-                        <div className="d-flex gap-2">
-                          <button
-                            type="button"
-                            className="btn-hh-primary d-inline-flex align-items-center gap-1"
-                            style={{ padding: '7px 16px', fontSize: 'var(--text-sm)' }}
-                            disabled={isBusy}
-                            onClick={() => handlePickedUp(listing.id)}
-                          >
-                            <CheckCircle2 size={16} />
-                            <span>{isBusy ? 'Saving...' : 'Picked Up'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-hh-secondary d-inline-flex align-items-center gap-1"
-                            style={{ padding: '7px 14px', fontSize: 'var(--text-sm)' }}
-                            disabled={isBusy}
-                            onClick={() => handleRelease(listing.id)}
-                            title="If the NGO cannot come, return listing to Available"
-                          >
-                            <RotateCcw size={15} />
-                            <span>Release</span>
-                          </button>
                         </div>
                       </div>
+
+                      {/* Info indicator that other requests are waiting in queue */}
+                      {pendingRequests.filter((r) => String(r.ngoId) !== String(acceptedNgo?.ngoId)).length > 0 && (
+                        <div
+                          className="px-3 py-2 rounded text-muted"
+                          style={{
+                            background: '#f8fafc',
+                            border: '1px dashed var(--color-border)',
+                            fontSize: '12px',
+                          }}
+                        >
+                          <span className="fw-semibold text-dark">
+                            {pendingRequests.filter((r) => String(r.ngoId) !== String(acceptedNgo?.ngoId)).length} other NGO request(s) waiting in queue.
+                          </span>{' '}
+                          They are held in queue and will appear for your acceptance if you release the current NGO.
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -611,52 +643,6 @@ export default function DonorDashboard() {
                     </button>
                   </div>
 
-                  {/* Trust Signals Row */}
-                  <div className="row g-2 mb-3">
-                    <div className="col-6">
-                      <div
-                        className="p-3 rounded"
-                        style={{
-                          background: 'var(--color-primary-light, #e8f5e9)',
-                          border: '1px solid rgba(22, 163, 74, 0.25)',
-                        }}
-                      >
-                        <div className="d-flex align-items-center gap-1 text-success mb-1" style={{ fontSize: '12px', fontWeight: 600 }}>
-                          <CheckCircle2 size={14} />
-                          <span>Track Record</span>
-                        </div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>
-                          {selectedNgo.completedPickupsCount ?? 0}
-                        </div>
-                        <div className="text-muted" style={{ fontSize: '11px' }}>
-                          Completed Pickups
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-6">
-                      <div
-                        className="p-3 rounded"
-                        style={{
-                          background: '#f8fafc',
-                          border: '1px solid var(--color-border, #e2e8f0)',
-                        }}
-                      >
-                        <div className="d-flex align-items-center gap-1 text-muted mb-1" style={{ fontSize: '12px', fontWeight: 600 }}>
-                          <Calendar size={14} />
-                          <span>Member Since</span>
-                        </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text)' }}>
-                          {selectedNgo.createdAt
-                            ? new Date(selectedNgo.createdAt).toLocaleDateString([], { month: 'short', year: 'numeric' })
-                            : 'Partner'}
-                        </div>
-                        <div className="text-muted" style={{ fontSize: '11px' }}>
-                          Platform Partner
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* NGO Coordinator & Contact details */}
                   <div
                     className="p-3 rounded mb-3"
@@ -685,7 +671,7 @@ export default function DonorDashboard() {
                           }}
                         >
                           <Phone size={13} />
-                          <span>{selectedNgo.phone} (Tap to Call)</span>
+                          <span>{selectedNgo.phone}</span>
                         </a>
                       ) : (
                         <span className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>Not provided</span>

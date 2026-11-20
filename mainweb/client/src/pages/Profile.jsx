@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -16,6 +16,10 @@ import {
   Shield,
   Check,
   X,
+  Clock,
+  Calendar,
+  CheckCircle2,
+  Inbox,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
@@ -41,6 +45,28 @@ export default function Profile() {
   const [cityError, setCityError] = useState('');
   const [addressError, setAddressError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Accepted Food History for NGO
+  const [acceptedOrders, setAcceptedOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+
+  useEffect(() => {
+    if (isNgo && user?.ngoStatus === 'approved') {
+      fetchAcceptedOrders();
+    }
+  }, [isNgo, user?.ngoStatus]);
+
+  async function fetchAcceptedOrders() {
+    setLoadingOrders(true);
+    try {
+      const { data } = await api.get('/donations/ngo-accepted-history');
+      setAcceptedOrders(data || []);
+    } catch (err) {
+      // non-blocking
+    } finally {
+      setLoadingOrders(false);
+    }
+  }
 
   function handleLogout() {
     logout();
@@ -459,7 +485,7 @@ export default function Profile() {
             className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
             style={{
               color: 'var(--color-text)',
-              borderBottom: !isNgo ? '1px solid var(--color-border)' : undefined,
+              borderBottom: '1px solid var(--color-border)',
               transition: 'background var(--transition)',
             }}
           >
@@ -482,6 +508,40 @@ export default function Profile() {
             </div>
             <ChevronRight size={18} color="var(--color-text-muted)" />
           </Link>
+
+          {/* NGO Action: Accepted Food History (Opens dedicated history page) */}
+          {isNgo && (
+            <Link
+              to="/accepted-food-history"
+              className="d-flex align-items-center justify-content-between p-4 text-decoration-none"
+              style={{
+                color: 'var(--color-text)',
+                transition: 'background var(--transition)',
+              }}
+            >
+              <div className="d-flex align-items-center gap-3">
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'var(--color-primary-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Package size={18} color="var(--color-primary)" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>Accepted Food History</div>
+                  <div className="text-muted small">View all orders accepted by your organization</div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--color-text-muted)" />
+            </Link>
+          )}
 
           {!isNgo && (
             /* Donor Action: My Donated Food (No Post Food Donation) */

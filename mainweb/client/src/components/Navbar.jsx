@@ -27,7 +27,7 @@ export default function Navbar() {
     };
 
     fetchUnread();
-    const interval = setInterval(fetchUnread, 45000); // Poll every 45s
+    const interval = setInterval(fetchUnread, 5000); // Live poll unread count every 5s
 
     return () => {
       isMounted = false;

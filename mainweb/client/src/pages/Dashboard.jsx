@@ -71,9 +71,15 @@ export default function Dashboard() {
       load();
     }, 250);
 
+    // Live update NGO feed every 6 seconds so newly accepted, requested, or released food reflects live
+    const interval = setInterval(() => {
+      load();
+    }, 6000);
+
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      clearInterval(interval);
     };
   }, [foodType, selectedCity, search]);
 

@@ -39,12 +39,18 @@ export default function DonateFood() {
     return () => clearInterval(timer);
   }, []);
 
-  // Compute default start time and end time (both start from current time)
+  // Compute default start time (now) and end time (now + 2 hours)
   const defaultTimes = useMemo(() => {
     const now = new Date();
-    const currentStr = getLocalDateTimeString(now);
-    return { startStr: currentStr, endStr: currentStr };
+    const startStr = getLocalDateTimeString(now);
+    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const endStr = getLocalDateTimeString(twoHoursLater);
+    return { startStr, endStr };
   }, []);
+
+  // Track if user manually adjusted pickup times
+  const [userChangedPickupFrom, setUserChangedPickupFrom] = useState(false);
+  const [userChangedPickupTo, setUserChangedPickupTo] = useState(false);
 
   // Form state
   const [items, setItems] = useState([
@@ -76,25 +82,51 @@ export default function DonateFood() {
 
   // Handle pickup times with past-time restriction
   function handlePickupFromChange(val) {
-    const minNow = getLocalDateTimeString();
-    if (val < minNow) {
-      toast.error('Pickup start time cannot be in the past');
-      updateForm('pickupFrom', minNow);
+    setUserChangedPickupFrom(true);
+    updateForm('pickupFrom', val);
+
+    // Allow 2-minute grace buffer for client clocks and entering times
+    const graceBuffer = new Date(Date.now() - 2 * 60 * 1000);
+    const minGraceString = getLocalDateTimeString(graceBuffer);
+
+    if (!val) {
+      setFieldErrors((prev) => ({ ...prev, pickupFrom: 'Pickup start time is required' }));
+    } else if (val < minGraceString) {
+      setFieldErrors((prev) => ({ ...prev, pickupFrom: 'Pickup start time cannot be in the past' }));
     } else {
-      updateForm('pickupFrom', val);
+      setFieldErrors((prev) => ({ ...prev, pickupFrom: '' }));
     }
-    if (fieldErrors.pickupFrom) setFieldErrors((prev) => ({ ...prev, pickupFrom: '' }));
+
+    if (form.pickupTo && val && form.pickupTo <= val) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        pickupTo: 'Pickup available end time must be after pickup start time',
+      }));
+    } else if (form.pickupTo && val && form.pickupTo > val && fieldErrors.pickupTo === 'Pickup available end time must be after pickup start time') {
+      setFieldErrors((prev) => ({ ...prev, pickupTo: '' }));
+    }
   }
 
   function handlePickupToChange(val) {
-    const minNow = getLocalDateTimeString();
-    const effectiveMin = form.pickupFrom && form.pickupFrom > minNow ? form.pickupFrom : minNow;
-    if (val < effectiveMin) {
-      toast.error('Pickup available end time cannot be before pickup start time or in the past');
-      return;
-    }
+    setUserChangedPickupTo(true);
     updateForm('pickupTo', val);
-    if (fieldErrors.pickupTo) setFieldErrors((prev) => ({ ...prev, pickupTo: '' }));
+
+    // Allow 2-minute grace buffer for client clocks
+    const graceBuffer = new Date(Date.now() - 2 * 60 * 1000);
+    const minGraceString = getLocalDateTimeString(graceBuffer);
+
+    if (!val) {
+      setFieldErrors((prev) => ({ ...prev, pickupTo: 'Pickup available end time is required' }));
+    } else if (val < minGraceString) {
+      setFieldErrors((prev) => ({ ...prev, pickupTo: 'Pickup available end time cannot be in the past' }));
+    } else if (form.pickupFrom && val <= form.pickupFrom) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        pickupTo: 'Pickup available end time must be after pickup start time',
+      }));
+    } else {
+      setFieldErrors((prev) => ({ ...prev, pickupTo: '' }));
+    }
   }
 
   // Manage multiple item rows
@@ -201,14 +233,29 @@ export default function DonateFood() {
       (it, idx) => !newItemErrors[idx]?.name && !newItemErrors[idx]?.quantity && it.name.trim() && it.quantity
     );
 
-    // 7. Pickup Window validation (pickupFrom and pickupTo only, no expiry)
-    if (!form.pickupFrom) errors.pickupFrom = 'Pickup start time is required';
-    if (!form.pickupTo) errors.pickupTo = 'Pickup available end time is required';
+    // 7. Pickup Window: if donor didn't manually customize, refresh start time to exact current moment
+    let finalPickupFrom = form.pickupFrom;
+    let finalPickupTo = form.pickupTo;
 
-    if (form.pickupFrom && form.pickupTo) {
-      const fromDate = new Date(form.pickupFrom);
-      const toDate = new Date(form.pickupTo);
-      const nowWithBuffer = Date.now() - 30000;
+    const currentMoment = new Date();
+    if (!userChangedPickupFrom) {
+      finalPickupFrom = getLocalDateTimeString(currentMoment);
+      updateForm('pickupFrom', finalPickupFrom);
+    }
+    if (!userChangedPickupTo) {
+      const twoHoursLater = new Date(currentMoment.getTime() + 2 * 60 * 60 * 1000);
+      finalPickupTo = getLocalDateTimeString(twoHoursLater);
+      updateForm('pickupTo', finalPickupTo);
+    }
+
+    if (!finalPickupFrom) errors.pickupFrom = 'Pickup start time is required';
+    if (!finalPickupTo) errors.pickupTo = 'Pickup available end time is required';
+
+    if (finalPickupFrom && finalPickupTo) {
+      const fromDate = new Date(finalPickupFrom);
+      const toDate = new Date(finalPickupTo);
+      // Allow 2-minute buffer so submitting right at the current minute does not trigger past warning
+      const nowWithBuffer = Date.now() - 2 * 60 * 1000;
       if (fromDate.getTime() < nowWithBuffer) {
         errors.pickupFrom = 'Pickup start time cannot be in the past';
       }
@@ -228,8 +275,8 @@ export default function DonateFood() {
 
     setLoading(true);
     try {
-      const fromDate = new Date(form.pickupFrom);
-      const toDate = new Date(form.pickupTo);
+      const fromDate = new Date(finalPickupFrom);
+      const toDate = new Date(finalPickupTo);
 
       await api.post('/food', {
         items: validItems,
@@ -620,12 +667,12 @@ export default function DonateFood() {
                     onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
                     style={{
-                      borderColor: hasSubmitted && fieldErrors.pickupFrom ? 'var(--color-danger)' : undefined,
+                      borderColor: fieldErrors.pickupFrom ? 'var(--color-danger)' : undefined,
                     }}
                     value={form.pickupFrom}
                     onChange={(e) => handlePickupFromChange(e.target.value)}
                   />
-                  {hasSubmitted && fieldErrors.pickupFrom && (
+                  {fieldErrors.pickupFrom && (
                     <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                       <AlertCircle size={12} />
                       <span>{fieldErrors.pickupFrom}</span>
@@ -644,12 +691,12 @@ export default function DonateFood() {
                     onFocus={() => setCurrentMinTime(getLocalDateTimeString())}
                     className="form-control"
                     style={{
-                      borderColor: hasSubmitted && fieldErrors.pickupTo ? 'var(--color-danger)' : undefined,
+                      borderColor: fieldErrors.pickupTo ? 'var(--color-danger)' : undefined,
                     }}
                     value={form.pickupTo}
                     onChange={(e) => handlePickupToChange(e.target.value)}
                   />
-                  {hasSubmitted && fieldErrors.pickupTo && (
+                  {fieldErrors.pickupTo && (
                     <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                       <AlertCircle size={12} />
                       <span>{fieldErrors.pickupTo}</span>

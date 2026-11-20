@@ -13,6 +13,7 @@ const {
   releaseFood,
   markPickedUp,
   getNgoProfileForDonor,
+  getNgoAcceptedHistory,
 } = require('../controllers/donationController');
 
 const router = express.Router();
@@ -22,6 +23,7 @@ router.use(authMiddleware);
 router.get('/', listDonations);
 router.get('/mine', getMyHistory);
 router.get('/my-history', getMyHistory);
+router.get('/ngo-accepted-history', getNgoAcceptedHistory);
 router.post('/', createDonation);
 router.get('/:id', getDonation);
 

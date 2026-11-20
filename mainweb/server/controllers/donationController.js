@@ -52,6 +52,7 @@ function publicDonation(doc, reqUser, blockedNgoIds = []) {
   let hasRequested = false;
   let myRequestStatus = null;
   let myRequestId = null;
+  let isAcceptedByMe = false;
   if (reqUser && reqUser._id) {
     const myReq = allRequests.find((r) => String(r.ngoId) === String(reqUser._id) && r.status !== 'cancelled');
     if (myReq) {
@@ -60,6 +61,13 @@ function publicDonation(doc, reqUser, blockedNgoIds = []) {
       if (myReq.status === 'pending' || myReq.status === 'accepted') {
         hasRequested = true;
       }
+    }
+
+    if (
+      (doc.acceptedNgo && String(doc.acceptedNgo.ngoId) === String(reqUser._id)) ||
+      (myRequestStatus === 'accepted')
+    ) {
+      isAcceptedByMe = true;
     }
   }
 
@@ -121,6 +129,7 @@ function publicDonation(doc, reqUser, blockedNgoIds = []) {
     hasRequested,
     myRequestStatus,
     myRequestId,
+    isAcceptedByMe,
     requests,
     acceptedNgo,
     bookedByNgoName: acceptedNgo?.ngoName || doc.bookedByNgoName || '',
@@ -155,9 +164,10 @@ async function listDonations(req, res) {
     const blockedUsers = await User.find({ isBlocked: true }, '_id');
     const blockedIds = blockedUsers.map((u) => u._id);
 
-    // NGO feed shows ONLY active "available" listings where neither expiryAt nor pickupTo has passed
+    // NGO feed shows active "available" and "accepted" listings until they are actually picked up
+    // (When an NGO request is accepted, it stays on the NGO feed screen so NGOs can track it, until picked up)
     const filter = {
-      status: 'available',
+      status: { $in: ['available', 'accepted', 'booked'] },
       donorId: { $nin: blockedIds },
       $and: [
         {
@@ -463,11 +473,14 @@ async function requestPickup(req, res) {
     await donation.save();
 
     // Requirement 3: Send notification to donor
+    const reqTimeStr = requestDoc.createdAt
+      ? new Date(requestDoc.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
     await sendNotification({
       userId: donation.donorId,
       type: 'request_received',
       title: 'New Pickup Request',
-      message: `${ngoName} requested your food (${donation.foodName || 'Donation'}).`,
+      message: `${ngoName} requested your food (${donation.foodName || 'Donation'})${reqTimeStr ? ` at ${reqTimeStr}` : ''}.`,
       link: '/my-donations',
       relatedFoodId: donation._id,
       relatedRequestId: requestDoc._id,
@@ -531,7 +544,7 @@ async function cancelPickupRequest(req, res) {
 }
 
 // Donor accepts an NGO's request:
-// Food becomes Accepted, accepted NGO is stored, and other requests are closed automatically
+// Food becomes Accepted, accepted NGO is stored, and other requests remain in queue
 async function acceptRequest(req, res) {
   try {
     const donation = await FoodDonation.findById(req.params.id);
@@ -559,64 +572,58 @@ async function acceptRequest(req, res) {
     targetRequest.status = 'accepted';
     await targetRequest.save();
 
-    // Close all other pending requests on this food in Request collection
+    // KEEP other pending requests in Request collection in 'pending' status (queued)
     const otherPending = await Request.find({
       foodId: donation._id,
       _id: { $ne: targetRequest._id },
       status: 'pending',
     });
 
-    await Request.updateMany(
-      {
-        foodId: donation._id,
-        _id: { $ne: targetRequest._id },
-        status: 'pending',
-      },
-      { status: 'closed' }
-    );
-
     // Sync subdocuments on donation
     donation.requests = donation.requests || [];
     for (const r of donation.requests) {
       if (String(r._id) === String(targetRequest._id)) {
         r.status = 'accepted';
-      } else if (r.status === 'pending') {
-        r.status = 'closed';
       }
+      // other requests remain pending in queue
     }
 
+    const now = new Date();
     donation.status = 'accepted';
     donation.acceptedNgo = {
       ngoId: targetRequest.ngoId,
       ngoName: targetRequest.ngoName,
       coordinatorName: targetRequest.coordinatorName,
       phone: targetRequest.phone,
-      acceptedAt: new Date(),
+      acceptedAt: now,
     };
     donation.bookedByNgoName = targetRequest.ngoName;
-    donation.bookedAt = new Date();
+    donation.bookedAt = now;
 
     await donation.save();
+
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 
     // Notify accepted NGO
     await sendNotification({
       userId: targetRequest.ngoId,
       type: 'request_accepted',
       title: 'Pickup Request Accepted!',
-      message: `Your request was accepted. You can now see the donor's contact for ${donation.foodName}.`,
+      message: `Your pickup request for "${donation.foodName}" has been accepted on ${dateStr} at ${timeStr}. Please coordinate with the donor for pickup.`,
       link: `/food/${donation._id}`,
       relatedFoodId: donation._id,
       relatedRequestId: targetRequest._id,
     });
 
-    // Notify other competing NGOs that food went to another organization
+    // Notify other competing NGOs that donor accepted another NGO, but their request is queued
     for (const oth of otherPending) {
       await sendNotification({
         userId: oth.ngoId,
-        type: 'request_closed',
-        title: 'Food Request Update',
-        message: `The food (${donation.foodName}) was accepted by another NGO.`,
-        link: '/feed',
+        type: 'request_queued',
+        title: 'Request in Queue',
+        message: `The donor accepted another NGO for "${donation.foodName}" at ${timeStr}, but your request remains in queue. If they do not collect in time, the donor may accept your request.`,
+        link: `/food/${donation._id}`,
         relatedFoodId: donation._id,
         relatedRequestId: oth._id,
       });
@@ -691,6 +698,21 @@ async function releaseFood(req, res) {
 
     const prevAcceptedNgoId = donation.acceptedNgo?.ngoId;
 
+    // Reset previous accepted request to cancelled or keep pending if requested
+    if (prevAcceptedNgoId) {
+      await Request.updateMany(
+        { foodId: donation._id, ngoId: prevAcceptedNgoId, status: 'accepted' },
+        { status: 'cancelled' }
+      );
+      if (donation.requests) {
+        for (const r of donation.requests) {
+          if (String(r.ngoId) === String(prevAcceptedNgoId) && r.status === 'accepted') {
+            r.status = 'cancelled';
+          }
+        }
+      }
+    }
+
     donation.status = 'available';
     donation.acceptedNgo = null;
     donation.bookedByNgoName = '';
@@ -729,9 +751,45 @@ async function markPickedUp(req, res) {
       return res.status(400).json({ message: 'This listing cannot be marked as picked up' });
     }
 
+    const now = new Date();
     donation.status = 'pickedUp';
-    donation.pickedUpAt = new Date();
+    donation.pickedUpAt = now;
+
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+    // Close any other pending/queued requests silently without sending unnecessary picked-by-other notification
+    const remainingPending = await Request.find({
+      foodId: donation._id,
+      status: 'pending',
+    });
+
+    if (remainingPending.length > 0) {
+      await Request.updateMany(
+        { foodId: donation._id, status: 'pending' },
+        { status: 'closed' }
+      );
+
+      if (donation.requests) {
+        for (const r of donation.requests) {
+          if (r.status === 'pending') {
+            r.status = 'closed';
+          }
+        }
+      }
+    }
+
     await donation.save();
+
+    // Send order completion notification to donor
+    await sendNotification({
+      userId: donation.donorId,
+      type: 'order_completed',
+      title: 'Order Completed',
+      message: `Your "${donation.foodName}" donation order was completed and picked up by ${donation.acceptedNgo?.ngoName || 'the NGO'} on ${dateStr} at ${timeStr}.`,
+      link: '/my-donated-food',
+      relatedFoodId: donation._id,
+    });
 
     return res.json(publicDonation(donation, req.user));
   } catch (err) {
@@ -816,6 +874,62 @@ async function bookFood(req, res) {
   }
 }
 
+// Get accepted food history for the authenticated NGO
+async function getNgoAcceptedHistory(req, res) {
+  try {
+    if (!req.user || req.user.ngoStatus !== 'approved' || req.user.isBlocked) {
+      return res.status(403).json({ message: 'Only approved NGOs can view accepted food history' });
+    }
+
+    const ngoId = req.user._id;
+    const ngoName = req.user.ngoDetails?.ngoName || req.user.name;
+
+    // Find all donations where this NGO was accepted (status 'accepted', 'booked', or 'pickedUp')
+    const donations = await FoodDonation.find({
+      $or: [
+        { 'acceptedNgo.ngoId': ngoId },
+        { bookedByNgoName: ngoName },
+      ],
+      status: { $in: ['accepted', 'booked', 'pickedUp', 'picked_up'] },
+    }).sort({ 'acceptedNgo.acceptedAt': -1, bookedAt: -1, createdAt: -1 });
+
+    const formatted = donations.map((doc) => {
+      // Date when received / accepted
+      const receivedDate = doc.acceptedNgo?.acceptedAt || doc.bookedAt || doc.createdAt;
+      
+      const itemsList = (doc.items && doc.items.length > 0)
+        ? doc.items.map((it) => ({
+            name: it.name,
+            quantity: it.quantity,
+            unit: it.unit,
+          }))
+        : (doc.foodName ? [{ name: doc.foodName, quantity: doc.quantity || '1', unit: 'portions' }] : []);
+
+      // Calculate total item count and quantity summary
+      const totalItemCount = itemsList.length;
+      const totalQuantity = itemsList.map((it) => `${it.quantity} ${it.unit}`).join(' + ');
+
+      return {
+        id: doc._id,
+        foodName: doc.foodName || (itemsList[0]?.name) || 'Food Donation',
+        donorName: doc.donorName,
+        donorPhone: doc.donorPhone,
+        address: doc.address || '',
+        city: doc.city || '',
+        items: itemsList,
+        totalItemCount,
+        totalQuantity,
+        receivedDate,
+        status: doc.status === 'picked_up' ? 'pickedUp' : doc.status === 'booked' ? 'accepted' : doc.status,
+      };
+    });
+
+    return res.json(formatted);
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to load accepted food history' });
+  }
+}
+
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -833,4 +947,5 @@ module.exports = {
   releaseFood,
   markPickedUp,
   getNgoProfileForDonor,
+  getNgoAcceptedHistory,
 };

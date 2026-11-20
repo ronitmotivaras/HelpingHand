@@ -39,11 +39,14 @@ function getNotificationIcon(type) {
     case 'request_received':
       return <Package size={18} color="#2563eb" />;
     case 'request_accepted':
+    case 'order_completed':
       return <CheckCircle2 size={18} color="#16a34a" />;
     case 'request_declined':
     case 'request_closed':
     case 'request_cancelled':
       return <XCircle size={18} color="#dc2626" />;
+    case 'request_queued':
+      return <Clock size={18} color="#d97706" />;
     case 'listing_released':
       return <Package size={18} color="#d97706" />;
     case 'listing_expired':
@@ -58,57 +61,53 @@ function getNotificationIcon(type) {
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [markingAll, setMarkingAll] = useState(false);
 
-  async function loadNotifications() {
-    setLoading(true);
+  // Set of notification IDs that were unread in this session
+  const [sessionUnreadIds, setSessionUnreadIds] = useState(() => new Set());
+
+  async function loadNotifications(isBackground = false) {
+    if (!isBackground) setLoading(true);
     try {
       const { data } = await api.get('/notifications');
-      setNotifications(data);
+      const list = data || [];
+
+      // Record any notification that is currently isRead === false
+      setSessionUnreadIds((prev) => {
+        const next = new Set(prev);
+        list.forEach((n) => {
+          if (!n.isRead) next.add(String(n._id));
+        });
+        return next;
+      });
+
+      setNotifications(list);
     } catch (err) {
-      toast.error('Failed to load notifications');
+      if (!isBackground) toast.error('Failed to load notifications');
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   }
 
   useEffect(() => {
     loadNotifications();
+
+    // Live polling for notifications page every 5 seconds
+    const interval = setInterval(() => {
+      loadNotifications(true);
+    }, 5000);
+
+    // ONLY mark as viewed / read when the user leaves/navigates away from this page
+    return () => {
+      clearInterval(interval);
+      api.patch('/notifications/mark-all-read').catch(() => {});
+    };
   }, []);
-
-  async function handleMarkAllRead() {
-    setMarkingAll(true);
-    try {
-      await api.patch('/notifications/mark-all-read');
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      toast.success('All notifications marked as read');
-    } catch (err) {
-      toast.error('Failed to mark all as read');
-    } finally {
-      setMarkingAll(false);
-    }
-  }
-
-  async function handleClickNotification(notification) {
-    if (!notification.isRead) {
-      try {
-        await api.patch(`/notifications/${notification._id}/read`);
-        setNotifications((prev) =>
-          prev.map((n) => (n._id === notification._id ? { ...n, isRead: true } : n))
-        );
-      } catch (err) {
-        // Continue
-      }
-    }
-  }
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <>
       <Navbar />
       <main className="hh-page" style={{ maxWidth: '720px', paddingBottom: '96px' }}>
-        {/* Back and Page Header */}
+        {/* Back link */}
         <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
           <Link
             to="/"
@@ -118,19 +117,6 @@ export default function Notifications() {
             <ArrowLeft size={16} />
             <span>Back</span>
           </Link>
-
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              className="btn-hh-secondary d-inline-flex align-items-center gap-1"
-              style={{ padding: '6px 14px', fontSize: 'var(--text-small)' }}
-              disabled={markingAll}
-              onClick={handleMarkAllRead}
-            >
-              <CheckCheck size={16} />
-              <span>Mark all as read</span>
-            </button>
-          )}
         </div>
 
         <div className="d-flex align-items-center justify-content-between mb-3">
@@ -138,20 +124,6 @@ export default function Notifications() {
             <h1 className="display-title mb-0" style={{ fontSize: 'var(--text-2xl)' }}>
               Notifications
             </h1>
-            {unreadCount > 0 && (
-              <span
-                style={{
-                  background: 'var(--color-primary)',
-                  color: '#fff',
-                  borderRadius: 'var(--radius-full)',
-                  padding: '2px 8px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
-                {unreadCount} new
-              </span>
-            )}
           </div>
         </div>
 
@@ -187,43 +159,34 @@ export default function Notifications() {
         {!loading && notifications.length > 0 && (
           <div className="d-flex flex-column gap-2">
             {notifications.map((notif) => {
-              const isUnread = !notif.isRead;
+              // Highlight if it's currently unread or was unread when entering this session
+              const isUnread = !notif.isRead || sessionUnreadIds.has(String(notif._id));
               return (
                 <div
                   key={notif._id}
-                  onClick={() => handleClickNotification(notif)}
                   className="p-3 rounded d-flex align-items-start gap-3"
                   style={{
-                    background: isUnread ? '#f0fdf4' : 'var(--color-surface)',
-                    border: `1px solid ${isUnread ? '#bbf7d0' : 'var(--color-border)'}`,
-                    cursor: isUnread ? 'pointer' : 'default',
+                    background: isUnread ? '#eff6ff' : 'var(--color-surface)',
+                    border: `1px solid ${isUnread ? '#93c5fd' : 'var(--color-border)'}`,
+                    boxShadow: isUnread ? '0 1px 3px rgba(37, 99, 235, 0.08)' : 'none',
                     transition: 'all var(--transition)',
                     position: 'relative',
                   }}
-                  onMouseEnter={(e) => {
-                    if (isUnread) {
-                      e.currentTarget.style.boxShadow = 'var(--shadow-xs)';
-                      e.currentTarget.style.borderColor = 'var(--color-border-focus)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = 'none';
-                    if (!isUnread) e.currentTarget.style.borderColor = 'var(--color-border)';
-                  }}
                 >
-                  {/* Unread indicator dot */}
+                  {/* Unread indicator blue dot */}
                   {isUnread && (
                     <span
                       style={{
                         position: 'absolute',
                         top: '14px',
                         right: '14px',
-                        width: '9px',
-                        height: '9px',
-                        backgroundColor: '#16a34a',
+                        width: '10px',
+                        height: '10px',
+                        backgroundColor: '#2563eb',
                         borderRadius: '50%',
+                        boxShadow: '0 0 0 2px #dbeafe',
                       }}
-                      title="Unread notification"
+                      title="New notification"
                     />
                   )}
 
@@ -233,7 +196,7 @@ export default function Notifications() {
                       width: '38px',
                       height: '38px',
                       borderRadius: '50%',
-                      backgroundColor: isUnread ? '#dcfce7' : 'var(--color-surface-2)',
+                      backgroundColor: isUnread ? '#dbeafe' : 'var(--color-surface-2)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -246,7 +209,7 @@ export default function Notifications() {
                   {/* Body */}
                   <div style={{ flex: 1, paddingRight: isUnread ? '16px' : '0' }}>
                     {notif.title && (
-                      <div className="fw-bold mb-1" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text)' }}>
+                      <div className="fw-bold mb-1" style={{ fontSize: 'var(--text-sm)', color: isUnread ? '#1e40af' : 'var(--color-text)' }}>
                         {notif.title}
                       </div>
                     )}
@@ -254,8 +217,9 @@ export default function Notifications() {
                       className="mb-1"
                       style={{
                         fontSize: 'var(--text-sm)',
-                        color: isUnread ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                        color: isUnread ? '#1e3a8a' : 'var(--color-text-secondary)',
                         lineHeight: 1.45,
+                        fontWeight: isUnread ? 500 : 400,
                       }}
                     >
                       {notif.message}

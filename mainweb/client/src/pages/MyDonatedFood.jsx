@@ -30,7 +30,7 @@ function getStatusBadge(status, expired = false) {
     return <span className="badge-status pickedUp">Picked Up</span>;
   }
   if (status === 'expired' || expired) {
-    return <span className="badge-status expired">Expired</span>;
+    return <span className="badge-status expired">Not Accepted</span>;
   }
   if (status === 'accepted' || status === 'booked') {
     return <span className="badge-status accepted">Accepted</span>;
@@ -38,14 +38,13 @@ function getStatusBadge(status, expired = false) {
   return <span className="badge-status available">Available</span>;
 }
 
-function formatDate(dateStr) {
+function formatDateOnly(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  return d.toLocaleString([], {
+  return d.toLocaleDateString([], {
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    year: 'numeric',
   });
 }
 
@@ -139,7 +138,7 @@ export default function MyDonatedFood() {
               </div>
               <div>
                 <div className="donor-stat-value">{expiredCount}</div>
-                <div className="donor-stat-label">Expired</div>
+                <div className="donor-stat-label">Not Accepted</div>
               </div>
             </div>
           </div>
@@ -164,7 +163,7 @@ export default function MyDonatedFood() {
               className={`donor-nav-tab ${filterTab === 'expired' ? 'active' : ''}`}
               onClick={() => setFilterTab('expired')}
             >
-              <span>Expired</span>
+              <span>Not Accepted</span>
             </button>
           </div>
         </div>
@@ -192,7 +191,7 @@ export default function MyDonatedFood() {
               {filterTab === 'pickedUp'
                 ? 'No picked up donations yet'
                 : filterTab === 'expired'
-                ? 'No expired food donations'
+                ? 'No donations in Not Accepted'
                 : 'No donations posted yet'}
             </h3>
           </div>
@@ -233,42 +232,19 @@ export default function MyDonatedFood() {
                     <div>
                       <span className="text-muted d-block small">Quantity</span>
                       <strong className="d-flex align-items-center gap-1">
-                        <Package size={14} /> {item.quantity || '1 portion'}
+                        <Package size={14} />{' '}
+                        {item.items && item.items.length > 0
+                          ? item.items.map((it) => `${it.quantity} ${it.unit} ${it.name}`).join(', ')
+                          : item.quantity || '1 portion'}
                       </strong>
                     </div>
 
-                    {item.city && (
-                      <div>
-                        <span className="text-muted d-block small">City</span>
-                        <strong className="d-flex align-items-center gap-1">
-                          <MapPin size={14} /> {item.city}
-                        </strong>
-                      </div>
-                    )}
-
-                    {dateVal && (
-                      <div>
-                        <span className="text-muted d-block small">
-                          {item.status === 'pickedUp' || item.status === 'picked_up'
-                            ? 'Pickup Completed'
-                            : expired
-                            ? 'Expired At'
-                            : 'Available Until'}
-                        </span>
-                        <strong className="d-flex align-items-center gap-1">
-                          <Clock size={14} /> {formatDate(dateVal)}
-                        </strong>
-                      </div>
-                    )}
-
-                    {item.createdAt && (
-                      <div>
-                        <span className="text-muted d-block small">Posted On</span>
-                        <strong className="d-flex align-items-center gap-1">
-                          <Calendar size={14} /> {formatDate(item.createdAt)}
-                        </strong>
-                      </div>
-                    )}
+                    <div>
+                      <span className="text-muted d-block small">Date</span>
+                      <strong className="d-flex align-items-center gap-1">
+                        <Calendar size={14} /> {formatDateOnly(item.createdAt || item.updatedAt || dateVal)}
+                      </strong>
+                    </div>
                   </div>
 
                   {/* Recipient NGO Info if accepted or picked up */}

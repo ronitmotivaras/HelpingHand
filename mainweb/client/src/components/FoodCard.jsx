@@ -46,28 +46,73 @@ export default function FoodCard({ donation }) {
                 </span>
               </span>
             )}
-            {donation.hasRequested && (
-              <span className="badge-status pending" style={{ fontSize: '10px', padding: '2px 7px' }}>
-                Requested
-              </span>
+            {donation.status === 'accepted' || donation.status === 'booked' ? (
+              donation.isAcceptedByMe ? (
+                <span
+                  className="badge"
+                  style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    background: 'var(--color-primary-light, #e8f5e9)',
+                    color: 'var(--color-primary, #16a34a)',
+                    border: '1px solid rgba(22, 163, 74, 0.3)',
+                    fontWeight: 700,
+                    borderRadius: '12px',
+                  }}
+                >
+                  Your Request Accepted
+                </span>
+              ) : (
+                <span
+                  className="badge"
+                  style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    background: '#fef3c7',
+                    color: '#92400e',
+                    border: '1px solid #fde68a',
+                    fontWeight: 600,
+                    borderRadius: '12px',
+                  }}
+                >
+                  {donation.hasRequested ? 'In Queue (Other Accepted)' : 'Reserved for NGO'}
+                </span>
+              )
+            ) : (
+              donation.hasRequested && (
+                <span className="badge-status pending" style={{ fontSize: '10px', padding: '2px 7px' }}>
+                  Requested
+                </span>
+              )
             )}
           </div>
         </div>
 
         {/* Multiple items chips */}
         {donation.items && donation.items.length > 0 ? (
-          <div className="d-flex flex-wrap gap-1 my-1">
-            {donation.items.slice(0, 3).map((it, idx) => (
-              <span className="item-chip" key={idx}>
-                <strong>{it.quantity} {it.unit}</strong> {it.name}
-              </span>
-            ))}
-            {donation.items.length > 3 && (
-              <span className="item-chip text-muted">
-                +{donation.items.length - 3} more
-              </span>
-            )}
-          </div>
+          (() => {
+            // Filter out items where the title already duplicates the single item
+            const displayItems =
+              donation.items.length === 1 &&
+              donation.foodName?.toLowerCase().trim() === donation.items[0].name?.toLowerCase().trim()
+                ? []
+                : donation.items;
+
+            return displayItems.length > 0 ? (
+              <div className="d-flex flex-wrap gap-1 my-1">
+                {displayItems.slice(0, 3).map((it, idx) => (
+                  <span className="item-chip" key={idx}>
+                    <strong>{it.quantity} {it.unit}</strong> {it.name}
+                  </span>
+                ))}
+                {displayItems.length > 3 && (
+                  <span className="item-chip text-muted">
+                    +{displayItems.length - 3} more
+                  </span>
+                )}
+              </div>
+            ) : null;
+          })()
         ) : (
           <div className="food-card-body">
             <Package size={14} color="var(--color-text-muted)" />
