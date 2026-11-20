@@ -4,13 +4,11 @@ import toast from 'react-hot-toast';
 import {
   Plus,
   Package,
-  Clock,
   MapPin,
   CheckCircle2,
   XCircle,
   RotateCcw,
   Inbox,
-  Flame,
   Calendar,
   Phone,
   BadgeCheck,
@@ -26,7 +24,6 @@ function isListingExpired(l) {
   if (!l) return false;
   if (l.status === 'expired') return true;
   if (l.status === 'pickedUp') return false;
-  if (l.expiryAt && new Date(l.expiryAt).getTime() <= Date.now()) return true;
   if (l.pickupTo && new Date(l.pickupTo).getTime() <= Date.now()) return true;
   return false;
 }
@@ -53,14 +50,6 @@ function formatDate(dateStr) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function isExpiringSoon(expiryDateStr) {
-  if (!expiryDateStr) return false;
-  const exp = new Date(expiryDateStr).getTime();
-  const now = Date.now();
-  const diffHours = (exp - now) / (1000 * 60 * 60);
-  return diffHours > 0 && diffHours <= 3;
 }
 
 export default function DonorDashboard() {
@@ -214,7 +203,6 @@ export default function DonorDashboard() {
               const dietClass = isNonVeg ? 'non-veg' : isMixed ? 'mixed' : 'veg';
               const dietTitle = isNonVeg ? 'Non-Vegetarian' : isMixed ? 'Mixed (Veg & Non-Veg)' : 'Vegetarian';
               const isBusy = processingId === listing.id;
-              const urgent = isExpiringSoon(listing.expiryAt);
 
               const expired = isListingExpired(listing);
               const isAccepted = !expired && (listing.status === 'accepted' || listing.status === 'booked');
@@ -246,12 +234,6 @@ export default function DonorDashboard() {
                           <span className="diet-dot" />
                         </span>
                         <h3 className="card-title m-0">{listing.foodName}</h3>
-                        {urgent && !isPickedUp && !expired && (
-                          <span className="badge-use-quickly">
-                            <Flame size={12} />
-                            <span>Use quickly</span>
-                          </span>
-                        )}
                         {isAvailable && (
                           <span className="ngo-requests-badge">
                             <Users size={12} />
@@ -286,28 +268,23 @@ export default function DonorDashboard() {
                     </div>
                   )}
 
-                  {/* Pickup & Expiry timing row */}
+                  {/* Pickup timing row */}
                   <div
-                    className="row g-2 mb-3 py-2 border-top border-bottom"
-                    style={{ borderColor: 'var(--color-border-subtle)', fontSize: 'var(--text-sm)' }}
+                    className="mb-3 py-2 px-3 rounded"
+                    style={{
+                      background: 'var(--color-surface-2, #f9fafb)',
+                      border: '1px solid var(--color-border-subtle, #e5e7eb)',
+                      fontSize: 'var(--text-sm)',
+                    }}
                   >
-                    <div className="col-sm-6">
-                      <div className="text-muted d-flex align-items-center gap-1">
-                        <Calendar size={13} />
-                        <span>Pickup Window:</span>
-                      </div>
-                      <div className="fw-semibold mt-1">
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      <span className="text-muted d-flex align-items-center gap-1">
+                        <Calendar size={14} color="var(--color-primary)" />
+                        <strong>Pickup Window:</strong>
+                      </span>
+                      <span className="fw-semibold text-dark">
                         {formatDate(listing.pickupFrom)} — {formatDate(listing.pickupTo)}
-                      </div>
-                    </div>
-                    <div className="col-sm-6">
-                      <div className="text-muted d-flex align-items-center gap-1">
-                        <Clock size={13} />
-                        <span>Consume Before:</span>
-                      </div>
-                      <div className="fw-semibold mt-1" style={{ color: urgent && !expired ? 'var(--color-danger)' : 'inherit' }}>
-                        {formatDate(listing.expiryAt)}
-                      </div>
+                      </span>
                     </div>
                   </div>
 
@@ -326,7 +303,7 @@ export default function DonorDashboard() {
                         <strong style={{ fontSize: 'var(--text-sm)' }}>Food Has Expired</strong>
                       </div>
                       <p className="mb-0 mt-1" style={{ fontSize: 'var(--text-sm)', color: '#7f1d1d' }}>
-                        The pickup window or consume-by time for this listing has passed. It has been automatically moved out of active listings and hidden from NGOs so it cannot be claimed or consumed.
+                        The pickup window for this listing has passed. It has been automatically moved out of active listings and hidden from NGOs so it cannot be claimed.
                       </p>
                     </div>
                   )}

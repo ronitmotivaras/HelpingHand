@@ -120,15 +120,25 @@ export default function Register() {
 
     const errors = {};
 
-    // 1. Mobile validation: 10 digits only
+    // 1. Name validation
+    if (!donatorForm.name.trim()) {
+      errors.name = 'Please enter name';
+    }
+
+    // 2. Mobile validation: 10 digits only
     const mError = validateMobile(donatorForm.mobile);
     if (mError) errors.mobile = mError;
 
-    // 2. City validation
+    // 3. City validation
     if (!donatorForm.city.trim()) errors.city = 'Please select your city';
 
-    // 3. Password validation: 6-15 chars, A-Za-z0-9@ only
-    const pErrors = validatePassword(donatorForm.password);
+    // 4. Password validation: 6-15 chars, A-Za-z0-9@ only
+    let pErrors = [];
+    if (!donatorForm.password) {
+      pErrors = ['Please enter password'];
+    } else {
+      pErrors = validatePassword(donatorForm.password);
+    }
 
     // 5. Confirm password
     let cError = '';
@@ -143,6 +153,7 @@ export default function Register() {
     setFieldErrors(errors);
 
     if (pErrors.length > 0 || cError || Object.keys(errors).length > 0) {
+      toast.error('All fields are required');
       return;
     }
 
@@ -184,15 +195,35 @@ export default function Register() {
 
     const errors = {};
 
-    // 1. Mobile validation: 10 digits only
+    // 1. NGO Name validation
+    if (!ngoForm.ngoName.trim()) {
+      errors.ngoName = 'Organizations name is required';
+    }
+
+    // 2. Mobile validation: 10 digits only
     const mError = validateMobile(ngoForm.mobile);
     if (mError) errors.mobile = mError;
 
-    // 2. City validation
+    // 3. City validation
     if (!ngoForm.city.trim()) errors.city = 'Please select NGO city';
 
-    // 3. Password validation: 6-15 chars, A-Za-z0-9@ only
-    const pErrors = validatePassword(ngoForm.password);
+    // 4. Address validation
+    if (!ngoForm.address.trim()) {
+      errors.address = 'Please enter address';
+    }
+
+    // 5. Coordinator Name validation
+    if (!ngoForm.coordinatorName.trim()) {
+      errors.coordinatorName = 'Please enter coordinator name';
+    }
+
+    // 6. Password validation: 6-15 chars, A-Za-z0-9@ only
+    let pErrors = [];
+    if (!ngoForm.password) {
+      pErrors = ['Please enter password'];
+    } else {
+      pErrors = validatePassword(ngoForm.password);
+    }
 
     // 7. Confirm password
     let cError = '';
@@ -207,6 +238,7 @@ export default function Register() {
     setFieldErrors(errors);
 
     if (pErrors.length > 0 || cError || Object.keys(errors).length > 0) {
+      toast.error('All fields are required');
       return;
     }
 

@@ -17,15 +17,41 @@ export default function ChangePassword() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [passwordFocused, setPasswordFocused] = useState(false);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [currentPassError, setCurrentPassError] = useState('');
-  const [passwordErrors, setPasswordErrors] = useState([]);
+  const [newPassError, setNewPassError] = useState('');
   const [confirmError, setConfirmError] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
+  function handleCurrentPasswordChange(val) {
+    setOldPassword(val);
+    if (currentPassError) setCurrentPassError('');
+  }
+
+  function handleNewPasswordChange(val) {
+    setNewPassword(val);
+    if (newPassError) setNewPassError('');
+    if (confirmPassword) {
+      if (val !== confirmPassword) {
+        setConfirmError('Passwords do not match');
+      } else {
+        setConfirmError('');
+      }
+    }
+  }
+
+  function handleConfirmPasswordChange(val) {
+    setConfirmPassword(val);
+    if (!val) {
+      setConfirmError('');
+    } else if (newPassword && val !== newPassword) {
+      setConfirmError('Passwords do not match');
+    } else {
+      setConfirmError('');
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
-    setHasSubmitted(true);
 
     let curErr = '';
     if (!oldPassword.trim()) {
@@ -33,18 +59,26 @@ export default function ChangePassword() {
     }
     setCurrentPassError(curErr);
 
-    const pErrors = validatePassword(newPassword);
+    let nErr = '';
+    if (!newPassword) {
+      nErr = 'Please enter new password';
+    } else {
+      const pErrors = validatePassword(newPassword);
+      if (pErrors.length > 0) {
+        nErr = pErrors[0];
+      }
+    }
+    setNewPassError(nErr);
+
     let cError = '';
     if (!confirmPassword) {
       cError = 'Please re-enter your password';
     } else if (newPassword !== confirmPassword) {
       cError = 'Passwords do not match';
     }
-
-    setPasswordErrors(pErrors);
     setConfirmError(cError);
 
-    if (curErr || pErrors.length > 0 || cError) {
+    if (curErr || nErr || cError) {
       return;
     }
 
@@ -55,9 +89,17 @@ export default function ChangePassword() {
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setCurrentPassError('');
+      setNewPassError('');
+      setConfirmError('');
       navigate('/profile');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to change password');
+      const msg = err.response?.data?.message || 'Failed to change password';
+      if (/current password|incorrect|wrong|old password/i.test(msg)) {
+        setCurrentPassError(msg);
+      } else {
+        setCurrentPassError(msg);
+      }
     } finally {
       setIsUpdating(false);
     }
@@ -91,14 +133,11 @@ export default function ChangePassword() {
                   className="form-control"
                   style={{
                     paddingRight: '2.8rem',
-                    borderColor: hasSubmitted && currentPassError ? 'var(--color-danger)' : undefined,
+                    borderColor: currentPassError ? 'var(--color-danger)' : undefined,
                   }}
                   placeholder="Enter current password"
                   value={oldPassword}
-                  onChange={(e) => {
-                    setOldPassword(e.target.value);
-                    if (currentPassError) setCurrentPassError('');
-                  }}
+                  onChange={(e) => handleCurrentPasswordChange(e.target.value)}
                   onPaste={(e) => e.preventDefault()}
                 />
                 <button
@@ -124,7 +163,7 @@ export default function ChangePassword() {
                   {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              {hasSubmitted && currentPassError && (
+              {currentPassError && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={13} />
                   <span>{currentPassError}</span>
@@ -142,15 +181,12 @@ export default function ChangePassword() {
                   className="form-control"
                   style={{
                     paddingRight: '2.8rem',
-                    borderColor: hasSubmitted && passwordErrors.length > 0 ? 'var(--color-danger)' : undefined,
+                    borderColor: newPassError ? 'var(--color-danger)' : undefined,
                   }}
                   placeholder="Enter new password"
                   maxLength={15}
                   value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value);
-                    if (passwordErrors.length > 0) setPasswordErrors([]);
-                  }}
+                  onChange={(e) => handleNewPasswordChange(e.target.value)}
                   onFocus={() => setPasswordFocused(true)}
                   onBlur={() => setPasswordFocused(false)}
                   onPaste={(e) => e.preventDefault()}
@@ -202,12 +238,12 @@ export default function ChangePassword() {
                 </div>
               )}
 
-              {hasSubmitted && passwordErrors.map((err, idx) => (
-                <div key={idx} className="text-danger small mt-1 d-flex align-items-center gap-1">
+              {newPassError && (
+                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={13} />
-                  <span>{err}</span>
+                  <span>{newPassError}</span>
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Confirm Password */}
@@ -220,15 +256,12 @@ export default function ChangePassword() {
                   className="form-control"
                   style={{
                     paddingRight: '2.8rem',
-                    borderColor: hasSubmitted && confirmError ? 'var(--color-danger)' : undefined,
+                    borderColor: confirmError ? 'var(--color-danger)' : undefined,
                   }}
                   placeholder="Re-enter password"
                   maxLength={15}
                   value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (confirmError) setConfirmError('');
-                  }}
+                  onChange={(e) => handleConfirmPasswordChange(e.target.value)}
                   onPaste={(e) => e.preventDefault()}
                 />
                 <button
@@ -254,7 +287,7 @@ export default function ChangePassword() {
                   {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              {hasSubmitted && confirmError && (
+              {confirmError && (
                 <div className="text-danger small mt-1 d-flex align-items-center gap-1">
                   <AlertCircle size={13} />
                   <span>{confirmError}</span>

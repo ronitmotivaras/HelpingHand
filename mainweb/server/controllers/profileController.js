@@ -10,9 +10,18 @@ async function getProfile(req, res) {
 async function updateProfile(req, res) {
   try {
     const { name, mobile, city, coordinatorName, address, ngoName } = req.body;
+    const isNgo = Boolean(req.user.ngoStatus && req.user.ngoStatus !== 'none');
     const finalName = (ngoName || name || '').trim();
     if (!finalName) {
-      return res.status(400).json({ message: 'Name is required' });
+      return res.status(400).json({ message: isNgo ? 'Organizations name is required' : 'Name is required' });
+    }
+    if (isNgo) {
+      if (!coordinatorName || !String(coordinatorName).trim()) {
+        return res.status(400).json({ message: 'Coordinator name is required' });
+      }
+      if (!address || !String(address).trim()) {
+        return res.status(400).json({ message: 'Address is required' });
+      }
     }
     if (!mobile || !String(mobile).trim()) {
       return res.status(400).json({ message: 'Mobile number is required' });

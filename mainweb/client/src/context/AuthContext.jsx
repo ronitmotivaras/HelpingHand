@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/axiosInstance';
 
 const AuthContext = createContext(null);
@@ -15,6 +15,24 @@ function readUser() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(readUser);
   const [token, setToken] = useState(() => localStorage.getItem('userToken'));
+
+  async function refreshProfile() {
+    try {
+      const { data } = await api.get('/profile');
+      localStorage.setItem('hh_user', JSON.stringify(data));
+      setUser(data);
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  // Refresh user profile on mount if token is present to ensure latest verification status
+  useEffect(() => {
+    if (token) {
+      refreshProfile();
+    }
+  }, [token]);
 
   function persistUserSession(nextToken, nextUser) {
     localStorage.setItem('userToken', nextToken);
@@ -39,13 +57,6 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('hh_user');
     setToken(null);
     setUser(null);
-  }
-
-  async function refreshProfile() {
-    const { data } = await api.get('/profile');
-    localStorage.setItem('hh_user', JSON.stringify(data));
-    setUser(data);
-    return data;
   }
 
   const value = useMemo(

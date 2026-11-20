@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import { KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { KeyRound, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import api from '../api/axiosInstance';
 import { validatePassword } from '../utils/validation';
@@ -15,28 +15,66 @@ export default function ChangePassword() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  const [newPasswordErrors, setNewPasswordErrors] = useState([]);
+  const [currentPassError, setCurrentPassError] = useState('');
+  const [newPassError, setNewPassError] = useState('');
   const [confirmError, setConfirmError] = useState('');
 
   function handleChange(e) {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === 'currentPassword' && currentPassError) {
+      setCurrentPassError('');
+    }
+    if (name === 'newPassword') {
+      if (newPassError) setNewPassError('');
+      if (form.confirmPassword) {
+        if (value !== form.confirmPassword) {
+          setConfirmError('Passwords do not match');
+        } else {
+          setConfirmError('');
+        }
+      }
+    }
+    if (name === 'confirmPassword') {
+      if (!value) {
+        setConfirmError('');
+      } else if (form.newPassword && value !== form.newPassword) {
+        setConfirmError('Passwords do not match');
+      } else {
+        setConfirmError('');
+      }
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
 
-    const pErrors = validatePassword(form.newPassword);
+    let curErr = '';
+    if (!form.currentPassword.trim()) {
+      curErr = 'Please enter your current password';
+    }
+    setCurrentPassError(curErr);
+
+    let nErr = '';
+    if (!form.newPassword) {
+      nErr = 'Please enter new password';
+    } else {
+      const pErrors = validatePassword(form.newPassword);
+      if (pErrors.length > 0) {
+        nErr = pErrors[0];
+      }
+    }
+    setNewPassError(nErr);
 
     let cError = '';
-    if (form.newPassword !== form.confirmPassword) {
+    if (!form.confirmPassword) {
+      cError = 'Please re-enter your password';
+    } else if (form.newPassword !== form.confirmPassword) {
       cError = 'Passwords do not match';
     }
-
-    setNewPasswordErrors(pErrors);
     setConfirmError(cError);
 
-    if (pErrors.length > 0 || cError) {
+    if (curErr || nErr || cError) {
       return;
     }
 
@@ -48,44 +86,28 @@ export default function ChangePassword() {
       });
       toast.success('Password updated successfully');
       setForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setNewPasswordErrors([]);
+      setCurrentPassError('');
+      setNewPassError('');
       setConfirmError('');
     } catch (err) {
       if (err.name === 'CanceledError' || err.message === 'Session expired') return;
       if (err.response?.status === 401 && err.response?.data?.message !== 'Current password is incorrect') return;
-      toast.error(err.response?.data?.message || 'Failed to update password');
+      const msg = err.response?.data?.message || 'Failed to update password';
+      if (/current password|incorrect|wrong/i.test(msg)) {
+        setCurrentPassError(msg);
+      } else {
+        setCurrentPassError(msg);
+      }
     } finally {
       setIsSaving(false);
     }
   }
-
-  /* Simple strength indicator */
-  const strength = (() => {
-    const p = form.newPassword;
-    if (!p) return null;
-    let score = 0;
-    if (p.length >= 8) score++;
-    if (p.length >= 12) score++;
-    if (/[A-Z]/.test(p)) score++;
-    if (/[0-9]/.test(p)) score++;
-    if (/[^A-Za-z0-9]/.test(p)) score++;
-    if (score <= 1) return { label: 'Weak', color: 'var(--color-danger)', width: '25%' };
-    if (score <= 2) return { label: 'Fair', color: 'var(--color-warning)', width: '50%' };
-    if (score <= 3) return { label: 'Good', color: '#3b82f6', width: '75%' };
-    return { label: 'Strong', color: 'var(--color-success)', width: '100%' };
-  })();
 
   return (
     <div className="admin-layout">
       <AdminSidebar />
 
       <main className="admin-main">
-        <div className="admin-breadcrumb-bar">
-          <div>
-            <h1 className="admin-page-title">Change Password</h1>
-          </div>
-        </div>
-
         <div style={{ maxWidth: '560px' }}>
           <section className="admin-card-panel">
             <div className="panel-header">
@@ -108,7 +130,7 @@ export default function ChangePassword() {
               </h2>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ padding: 'var(--space-5)' }}>
+            <form onSubmit={handleSubmit} noValidate style={{ padding: 'var(--space-5)' }}>
               {/* Current Password */}
               <div className="mb-4">
                 <label
@@ -133,8 +155,10 @@ export default function ChangePassword() {
                     value={form.currentPassword}
                     onChange={handleChange}
                     onPaste={(e) => e.preventDefault()}
-                    required
-                    style={{ paddingRight: '44px' }}
+                    style={{
+                      paddingRight: '44px',
+                      borderColor: currentPassError ? 'var(--color-danger, #dc2626)' : undefined,
+                    }}
                   />
                   <button
                     type="button"
@@ -158,6 +182,12 @@ export default function ChangePassword() {
                     {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {currentPassError && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1" style={{ fontSize: '12px' }}>
+                    <AlertCircle size={13} />
+                    <span>{currentPassError}</span>
+                  </div>
+                )}
               </div>
 
               {/* New Password */}
@@ -185,8 +215,10 @@ export default function ChangePassword() {
                     value={form.newPassword}
                     onChange={handleChange}
                     onPaste={(e) => e.preventDefault()}
-                    required
-                    style={{ paddingRight: '44px' }}
+                    style={{
+                      paddingRight: '44px',
+                      borderColor: newPassError ? 'var(--color-danger, #dc2626)' : undefined,
+                    }}
                   />
                   <button
                     type="button"
@@ -210,54 +242,10 @@ export default function ChangePassword() {
                     {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-
-                {newPasswordErrors.map((err, idx) => (
-                  <p
-                    key={idx}
-                    style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-danger)',
-                      marginTop: '4px',
-                      marginBottom: 0,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {err}
-                  </p>
-                ))}
-
-                {/* Strength bar */}
-                {strength && (
-                  <div style={{ marginTop: '8px' }}>
-                    <div
-                      style={{
-                        height: '4px',
-                        borderRadius: '9999px',
-                        background: 'var(--color-border)',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: '100%',
-                          width: strength.width,
-                          background: strength.color,
-                          borderRadius: '9999px',
-                          transition: 'width 250ms ease, background 250ms ease',
-                        }}
-                      />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 'var(--text-xs)',
-                        fontWeight: 600,
-                        color: strength.color,
-                        marginTop: '4px',
-                        display: 'inline-block',
-                      }}
-                    >
-                      {strength.label}
-                    </span>
+                {newPassError && (
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1" style={{ fontSize: '12px' }}>
+                    <AlertCircle size={13} />
+                    <span>{newPassError}</span>
                   </div>
                 )}
               </div>
@@ -287,10 +275,9 @@ export default function ChangePassword() {
                     value={form.confirmPassword}
                     onChange={handleChange}
                     onPaste={(e) => e.preventDefault()}
-                    required
                     style={{
                       paddingRight: '44px',
-                      borderColor: confirmError ? 'var(--color-danger)' : undefined,
+                      borderColor: confirmError ? 'var(--color-danger, #dc2626)' : undefined,
                     }}
                   />
                   <button
@@ -316,16 +303,10 @@ export default function ChangePassword() {
                   </button>
                 </div>
                 {confirmError && (
-                  <p
-                    style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-danger)',
-                      marginTop: '5px',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {confirmError}
-                  </p>
+                  <div className="text-danger small mt-1 d-flex align-items-center gap-1" style={{ fontSize: '12px' }}>
+                    <AlertCircle size={13} />
+                    <span>{confirmError}</span>
+                  </div>
                 )}
               </div>
 
@@ -342,9 +323,12 @@ export default function ChangePassword() {
                   type="button"
                   className="btn-admin-outline"
                   disabled={isSaving}
-                  onClick={() =>
-                    setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                  }
+                  onClick={() => {
+                    setForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                    setCurrentPassError('');
+                    setNewPassError('');
+                    setConfirmError('');
+                  }}
                 >
                   Clear
                 </button>
@@ -352,12 +336,7 @@ export default function ChangePassword() {
                   id="change-password-submit"
                   type="submit"
                   className="btn-admin-primary"
-                  disabled={
-                    isSaving ||
-                    !form.currentPassword ||
-                    !form.newPassword ||
-                    !form.confirmPassword
-                  }
+                  disabled={isSaving}
                 >
                   <ShieldCheck size={15} strokeWidth={2} />
                   {isSaving ? 'Saving\u2026' : 'Update Password'}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Leaf, Lock, Eye, EyeOff } from 'lucide-react';
+import { Leaf, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AdminLogin() {
@@ -9,6 +9,7 @@ export default function AdminLogin() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   if (isAdmin) {
@@ -17,13 +18,18 @@ export default function AdminLogin() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!password.trim()) {
+      setError('Please enter password');
+      return;
+    }
+    setError('');
     setLoading(true);
     try {
       await adminLogin(password);
       toast.success('Signed in to Admin Console');
       navigate('/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Invalid admin password');
+      setError(err.response?.data?.message || 'Invalid admin password');
     } finally {
       setLoading(false);
     }
@@ -37,7 +43,6 @@ export default function AdminLogin() {
         <div className="d-flex align-items-center justify-content-center gap-2 mb-2">
           <Leaf size={30} color="var(--color-primary)" strokeWidth={2.5} />
           <h1 className="login-title mb-0" style={{ color: 'var(--color-primary)', display: 'inline' }}>HelpingHand</h1>
-          <span className="brand-tag">Admin</span>
         </div>
         <p className="login-subtitle mb-4">Platform Administration Console</p>
 
@@ -69,12 +74,18 @@ export default function AdminLogin() {
                 id="admin-pass"
                 type={showPassword ? 'text' : 'password'}
                 className="admin-form-input"
-                style={{ paddingLeft: '2.4rem', paddingRight: '2.8rem' }}
+                style={{
+                  paddingLeft: '2.4rem',
+                  paddingRight: '2.8rem',
+                  borderColor: error ? 'var(--color-danger, #dc2626)' : undefined,
+                }}
                 placeholder="Enter your admin password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError('');
+                }}
                 autoFocus
-                required
               />
               <button
                 type="button"
@@ -97,6 +108,12 @@ export default function AdminLogin() {
                 {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
+            {error && (
+              <div className="text-danger small mt-1 d-flex align-items-center gap-1" style={{ fontSize: '12px' }}>
+                <AlertCircle size={13} />
+                <span>{error}</span>
+              </div>
+            )}
           </div>
 
           <button

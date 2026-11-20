@@ -16,13 +16,20 @@ import api from '../api/axiosInstance';
 import { CITIES } from '../constants/cities';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const [selectedCity, setSelectedCity] = useState(user?.city || 'Ahmedabad');
   const [foodType, setFoodType] = useState('all');
   const [search, setSearch] = useState('');
   const [donations, setDonations] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Auto-refresh user verification status from backend on mount
+  useEffect(() => {
+    if (refreshProfile) {
+      refreshProfile().catch(() => {});
+    }
+  }, []);
 
   const isApprovedNgo = user?.ngoStatus === 'approved';
 

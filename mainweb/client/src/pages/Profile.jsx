@@ -85,9 +85,27 @@ export default function Profile() {
   async function saveEditing() {
     let hasError = false;
 
-    setNameError('');
+    if (!editName.trim()) {
+      setNameError(isNgo ? 'Organizations name is required' : 'Name is required');
+      hasError = true;
+    } else {
+      setNameError('');
+    }
+
     if (isNgo) {
-      setCoordError('');
+      if (!editCoordinatorName.trim()) {
+        setCoordError('Coordinator name is required');
+        hasError = true;
+      } else {
+        setCoordError('');
+      }
+
+      if (!editAddress.trim()) {
+        setAddressError('Address is required');
+        hasError = true;
+      } else {
+        setAddressError('');
+      }
     }
 
     const mErr = validateMobile(editMobile);
@@ -103,10 +121,6 @@ export default function Profile() {
       hasError = true;
     } else {
       setCityError('');
-    }
-
-    if (isNgo) {
-      setAddressError('');
     }
 
     if (hasError) {

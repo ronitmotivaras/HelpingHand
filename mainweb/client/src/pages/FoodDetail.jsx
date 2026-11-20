@@ -9,7 +9,6 @@ import {
   Package,
   UserCircle,
   Calendar,
-  Flame,
   Lock,
   Users,
   CheckCircle2,
@@ -28,14 +27,6 @@ function formatTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function isExpiringSoon(expiryDateStr) {
-  if (!expiryDateStr) return false;
-  const exp = new Date(expiryDateStr).getTime();
-  const now = Date.now();
-  const diffHours = (exp - now) / (1000 * 60 * 60);
-  return diffHours > 0 && diffHours <= 3;
 }
 
 export default function FoodDetail() {
@@ -68,7 +59,6 @@ export default function FoodDetail() {
     donation?.foodType?.toLowerCase() === 'mixed' || donation?.type?.toLowerCase() === 'mixed';
   const dietClass = isNonVeg ? 'non-veg' : isMixed ? 'mixed' : 'veg';
   const dietTitle = isNonVeg ? 'Non-Vegetarian' : isMixed ? 'Mixed (Veg & Non-Veg)' : 'Vegetarian';
-  const urgent = isExpiringSoon(donation?.expiryAt);
 
   const isOwner = Boolean(user && donation && String(donation.donorId) === String(user.id || user._id));
   const isNgo = Boolean(user?.ngoStatus && user.ngoStatus !== 'none');
@@ -145,12 +135,6 @@ export default function FoodDetail() {
                     <span className="diet-dot" />
                   </span>
                   <h1 className="section-title m-0">{donation.foodName}</h1>
-                  {urgent && donation.status !== 'pickedUp' && donation.status !== 'expired' && (
-                    <span className="badge-use-quickly">
-                      <Flame size={12} />
-                      <span>Use quickly</span>
-                    </span>
-                  )}
                   {donation.requestCount > 0 && donation.status === 'available' && (
                     <span className="ngo-requests-badge">
                       <Users size={12} />
@@ -259,17 +243,6 @@ export default function FoodDetail() {
               </strong>
             </div>
 
-            {/* Consume before */}
-            <div className="detail-row">
-              <span className="d-flex align-items-center gap-2">
-                <Clock size={16} color={urgent ? 'var(--color-danger)' : 'var(--color-text-muted)'} />
-                <span>Consume Before (Freshness Expiry)</span>
-              </span>
-              <strong style={{ color: urgent ? 'var(--color-danger)' : 'inherit' }}>
-                {formatTime(donation.expiryAt)}
-              </strong>
-            </div>
-
             {/* Address */}
             <div className="detail-row">
               <span className="d-flex align-items-center gap-2">
@@ -363,18 +336,14 @@ export default function FoodDetail() {
               </div>
             )}
 
-            {/* Direct connection note */}
-            <div className="p-3 mt-4 rounded" style={{ background: '#FFFFFF', border: '1px solid var(--color-border)' }}>
-              {donation.phoneVisible ? (
-                <p className="food-card-meta mb-0">
-                  💬 <strong>Direct Coordination:</strong> Talk by phone to agree on pickup details and containers before collection.
-                </p>
-              ) : (
+            {/* Verified NGO Access note if phone not visible */}
+            {!donation.phoneVisible && (
+              <div className="p-3 mt-4 rounded" style={{ background: '#FFFFFF', border: '1px solid var(--color-border)' }}>
                 <p className="food-card-meta mb-0 text-muted">
                   🔒 <strong>Verified NGO Access:</strong> To prevent fraud, donor contact numbers are accessible only to verified NGOs.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </main>

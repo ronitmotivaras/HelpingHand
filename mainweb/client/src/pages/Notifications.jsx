@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Bell,
@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   XCircle,
   CheckCircle2,
-  ArrowRight,
   ArrowLeft,
   Inbox,
   Flame,
@@ -60,7 +59,6 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
-  const navigate = useNavigate();
 
   async function loadNotifications() {
     setLoading(true);
@@ -99,12 +97,8 @@ export default function Notifications() {
           prev.map((n) => (n._id === notification._id ? { ...n, isRead: true } : n))
         );
       } catch (err) {
-        // Continue navigation regardless
+        // Continue
       }
-    }
-
-    if (notification.link) {
-      navigate(notification.link);
     }
   }
 
@@ -202,13 +196,15 @@ export default function Notifications() {
                   style={{
                     background: isUnread ? '#f0fdf4' : 'var(--color-surface)',
                     border: `1px solid ${isUnread ? '#bbf7d0' : 'var(--color-border)'}`,
-                    cursor: notif.link ? 'pointer' : 'default',
+                    cursor: isUnread ? 'pointer' : 'default',
                     transition: 'all var(--transition)',
                     position: 'relative',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = 'var(--shadow-xs)';
-                    if (!isUnread) e.currentTarget.style.borderColor = 'var(--color-border-focus)';
+                    if (isUnread) {
+                      e.currentTarget.style.boxShadow = 'var(--shadow-xs)';
+                      e.currentTarget.style.borderColor = 'var(--color-border-focus)';
+                    }
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.boxShadow = 'none';
@@ -267,12 +263,6 @@ export default function Notifications() {
                     <div className="d-flex align-items-center gap-2 text-muted" style={{ fontSize: '11px' }}>
                       <Clock size={12} />
                       <span>{formatNotificationTime(notif.createdAt)}</span>
-                      {notif.link && (
-                        <span className="d-inline-flex align-items-center gap-1 text-primary fw-semibold ms-2">
-                          <span>View details</span>
-                          <ArrowRight size={11} />
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Package, Clock, Calendar, ArrowRight, Flame, Users } from 'lucide-react';
+import { MapPin, Package, Calendar, ArrowRight, Users } from 'lucide-react';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -13,14 +13,6 @@ function formatDate(dateStr) {
   });
 }
 
-function isExpiringSoon(expiryDateStr) {
-  if (!expiryDateStr) return false;
-  const exp = new Date(expiryDateStr).getTime();
-  const now = Date.now();
-  const diffHours = (exp - now) / (1000 * 60 * 60);
-  return diffHours > 0 && diffHours <= 3;
-}
-
 export default function FoodCard({ donation }) {
   const isNonVeg =
     donation.foodType?.toLowerCase() === 'nonveg' ||
@@ -30,7 +22,6 @@ export default function FoodCard({ donation }) {
     donation.type?.toLowerCase() === 'mixed';
   const dietClass = isNonVeg ? 'non-veg' : isMixed ? 'mixed' : 'veg';
   const dietTitle = isNonVeg ? 'Non-Vegetarian' : isMixed ? 'Mixed (Veg & Non-Veg)' : 'Vegetarian';
-  const urgent = isExpiringSoon(donation.expiryAt);
 
   return (
     <Link to={`/food/${donation.id}`} className="text-decoration-none">
@@ -58,12 +49,6 @@ export default function FoodCard({ donation }) {
             {donation.hasRequested && (
               <span className="badge-status pending" style={{ fontSize: '10px', padding: '2px 7px' }}>
                 Requested
-              </span>
-            )}
-            {urgent && (
-              <span className="badge-use-quickly">
-                <Flame size={12} />
-                <span>Use quickly</span>
               </span>
             )}
           </div>
@@ -106,14 +91,6 @@ export default function FoodCard({ donation }) {
           <Calendar size={13} color="var(--color-primary)" />
           <span>
             <strong>Pickup:</strong> {formatDate(donation.pickupFrom)} — {formatDate(donation.pickupTo)}
-          </span>
-        </div>
-
-        {/* Food Expiry */}
-        <div className="food-card-meta" style={{ color: urgent ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
-          <Clock size={13} />
-          <span>
-            <strong>Consume before:</strong> {formatDate(donation.expiryAt)}
           </span>
         </div>
 

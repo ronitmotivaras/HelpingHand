@@ -156,17 +156,27 @@ export default function DonateFood() {
 
     const errors = {};
 
-    // 1. Mobile validation (10 digits only)
+    // 1. Contact Person validation
+    if (!form.contactName.trim()) {
+      errors.contactName = 'Please enter contact person name';
+    }
+
+    // 2. Mobile validation (10 digits only)
     const mErr = validateMobile(form.phone);
     if (mErr) errors.phone = mErr;
 
-    // 2. City validation
+    // 3. City validation
     if (!form.city.trim()) errors.city = 'Please select a city';
 
-    // 3. Food Category validation (user must choose from options)
+    // 4. Address validation
+    if (!form.address.trim()) {
+      errors.address = 'Please enter address';
+    }
+
+    // 5. Food Category validation (user must choose from options)
     if (!form.foodType) errors.foodType = 'Please select a food category';
 
-    // 4. Items validation
+    // 6. Items validation
     const newItemErrors = items.map((it) => {
       const err = {};
       const nameStr = (it.name || '').trim();
@@ -184,7 +194,7 @@ export default function DonateFood() {
     setItemErrors(newItemErrors);
     const hasItemError = newItemErrors.some((e) => e.name || e.quantity);
     if (hasItemError) {
-      errors.items = 'Please check food items marked in red';
+      errors._itemsInvalid = true;
     }
 
     const validItems = items.filter(
@@ -509,6 +519,7 @@ export default function DonateFood() {
                   <div style={{ width: '100px' }}>
                     <input
                       type="text"
+                      list="portion-options"
                       inputMode="decimal"
                       className="form-control"
                       style={{
@@ -521,6 +532,19 @@ export default function DonateFood() {
                         handleItemChange(idx, 'quantity', val);
                       }}
                     />
+                    <datalist id="portion-options">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="15">15</option>
+                      <option value="20">20</option>
+                      <option value="25">25</option>
+                      <option value="30">30</option>
+                      <option value="40">40</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                    </datalist>
                     {hasSubmitted && itemErrors[idx]?.quantity && (
                       <div className="text-danger small mt-1" style={{ fontSize: '11px', lineHeight: 1.2 }}>
                         {itemErrors[idx].quantity}
@@ -575,12 +599,6 @@ export default function DonateFood() {
                   </div>
                 )}
               </div>
-              {hasSubmitted && fieldErrors.items && (
-                <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                  <AlertCircle size={13} />
-                  <span>{fieldErrors.items}</span>
-                </div>
-              )}
             </div>
 
             {/* 6. Pickup Window (defaults to current time, future only, no past time allowed) */}
