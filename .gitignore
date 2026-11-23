@@ -1,9 +1,34 @@
+# Dependencies
 node_modules/
-.env
-client/build/
+package-lock.json
 
-# Logs
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Production builds
+build/
+client/build/
+dist/
+
+# Local database directory (WiredTiger / local binaries)
+.db/
+
+# Logs & Runtime
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

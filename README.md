@@ -20,7 +20,7 @@
 **HelpingHand** connects food donors (households, restaurants, event organizers, caterers) with verified charitable organizations, shelters, and community kitchens to eliminate edible food waste and combat hunger.
 
 The project is structured into two dedicated applications sharing a central database:
-1. **Main Web (`mainweb/`)**: Dual-role public portal for food donors and verified NGOs.
+1. **User Portal (`portal/`)**: Dual-role public portal for food donors and verified NGOs.
 2. **Admin Portal (`admin/`)**: Back-office operations interface for NGO credential verification, moderation, and fraud prevention.
 
 ---
@@ -29,7 +29,7 @@ The project is structured into two dedicated applications sharing a central data
 
 ```
 HelpingHand/
-├── mainweb/                  # Donor & NGO Public Platform
+├── portal/                   # Donor & NGO Public Platform
 │   ├── client/               # React 18 SPA (Port 3000)
 │   └── server/               # Express 5 REST API (Port 5000)
 │
@@ -40,8 +40,8 @@ HelpingHand/
 
 | Component | Layer | Port | URL / Health Check | Description |
 |---|---|:---:|---|---|
-| **Main Web Client** | Frontend | `3000` | [http://localhost:3000](http://localhost:3000) | Donor & NGO dashboard, listings, and notifications |
-| **Main Web Server** | Backend | `5000` | [http://localhost:5000/api/health](http://localhost:5000/api/health) | Auth, donation lifecycle, and automated expiry daemon |
+| **Portal Client** | Frontend | `3000` | [http://localhost:3000](http://localhost:3000) | Donor & NGO dashboard, listings, and notifications |
+| **Portal Server** | Backend | `5000` | [http://localhost:5000/api/health](http://localhost:5000/api/health) | Auth, donation lifecycle, and automated expiry daemon |
 | **Admin Client** | Frontend | `3001` | [http://localhost:3001](http://localhost:3001) | Administrative review, verification, and moderation |
 | **Admin Server** | Backend | `5001` | [http://localhost:5001/api/admin/health](http://localhost:5001/api/admin/health) | Admin auth, analytics, and telephone blacklist APIs |
 | **Database** | Storage | `27017` | `mongodb://127.0.0.1:27017/helpinghand` | Central MongoDB database |
@@ -89,8 +89,8 @@ sequenceDiagram
 
 ### 🛡️ For Platform Administrators
 - **Executive Analytics**: Real-time stats on registered donors, verified NGOs, pending applications, active listings, and completed handovers.
-- **NGO Verification Pipeline**: Review organization credentials, coordinator phone, and address; **Approve**, **Reject**, or reset to **Pending** with timestamped audit notes.
-- **User Directory**: Search, inspect, edit, or delete registered donor and NGO accounts.
+- **NGO Verification Pipeline**: Review organization credentials, coordinator phone, and address; **Approve**, **Reject**, or reset to **Pending** with confirmation modals and auto-focus for quick enter-key actions.
+- **User Directory**: Search, inspect, edit, block, unblock, or delete registered donor and NGO accounts.
 - **Fraud Prevention & Phone Blacklist**: Suspend bad actors with a mandatory audit reason. Blacklisted phone numbers are automatically blocked from future registrations.
 
 ---
@@ -104,25 +104,40 @@ sequenceDiagram
 
 ---
 
-## ⚙️ Environment Configuration
+## 🚀 Complete Setup & Run Guide
 
-Ensure each module has its `.env` file configured:
+### Step 1: Prerequisites
+Make sure the following are installed on the computer:
+1. **[Node.js](https://nodejs.org/)** (v18 or higher) — check with `node -v`
+2. **[Git](https://git-scm.com/)** — check with `git --version`
+3. **[MongoDB Community Server](https://www.mongodb.com/try/download/community)** (Windows MSI Installer)
+   * During installation, keep **"Install MongoD as a Service"** checked so MongoDB runs in the background.
+   * You do **not** need to manually create any database tables or collections. When the backend boots, Mongoose automatically generates the `helpinghand` database and all required collections/indexes.
 
-### 1. Main Web Backend (`mainweb/server/.env`)
+### Step 2: Clone Repository
+```bash
+git clone <YOUR_GITHUB_REPO_URL>
+cd HelpingHand
+```
+
+### Step 3: Configure Environment Files (`.env`)
+Create the following **4 `.env` files** in their respective directories:
+
+#### 1. User Portal Backend (`portal/server/.env`)
 ```env
 PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/helpinghand
 USER_JWT_SECRET=helpinghand_dev_secret_change_me
 ```
 
-### 2. Main Web Frontend (`mainweb/client/.env`)
+#### 2. User Portal Frontend (`portal/client/.env`)
 ```env
 PORT=3000
 REACT_APP_API_URL=http://localhost:5000
 BROWSER=none
 ```
 
-### 3. Admin Backend (`admin/server/.env`)
+#### 3. Admin Backend (`admin/server/.env`)
 ```env
 PORT=5001
 MONGO_URI=mongodb://127.0.0.1:27017/helpinghand
@@ -132,41 +147,40 @@ ADMIN_PASSWORD_HASH=
 ```
 *(Leave `ADMIN_PASSWORD_HASH` blank to auto-hash `ADMIN_PASSWORD` on startup)*
 
-### 4. Admin Frontend (`admin/client/.env`)
+#### 4. Admin Frontend (`admin/client/.env`)
 ```env
 PORT=3001
 REACT_APP_API_URL=http://localhost:5001
 BROWSER=none
 ```
 
----
+### Step 4: Install Dependencies
 
-## 🚀 Quick Start Guide
+**Option A — All in one command (PowerShell / Windows):**
+```powershell
+npm --prefix portal/server install; npm --prefix portal/client install; npm --prefix admin/server install; npm --prefix admin/client install
+```
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18+)
-- [MongoDB](https://www.mongodb.com/) running locally on port `27017`
-
-### 1. Install Dependencies
+**Option B — Individually:**
 ```bash
-# Main Web
-cd mainweb/server && npm install
+# 1. User Portal
+cd portal/server && npm install
 cd ../client && npm install
 
-# Admin Portal
+# 2. Admin Portal
 cd ../../admin/server && npm install
 cd ../client && npm install
 ```
 
-### 2. Start Services
-Run each service in a separate terminal:
+### Step 5: Start Services
+Open **4 separate terminal windows** (or split terminals):
 
 ```bash
-# Terminal 1: Main Web Backend (Port 5000)
-cd mainweb/server && npm run dev
+# Terminal 1: User Portal Backend (Port 5000)
+cd portal/server && npm run dev
 
-# Terminal 2: Main Web Frontend (Port 3000)
-cd mainweb/client && npm start
+# Terminal 2: User Portal Frontend (Port 3000)
+cd portal/client && npm start
 
 # Terminal 3: Admin Backend (Port 5001)
 cd admin/server && npm run dev
@@ -175,6 +189,23 @@ cd admin/server && npm run dev
 cd admin/client && npm start
 ```
 
-- **Main Web**: [http://localhost:3000](http://localhost:3000)
-- **Admin Panel**: [http://localhost:3001](http://localhost:3001) *(Default password: `admin123`)*
+### Step 6: Default Credentials & Access
 
+| Application | URL | Default Login |
+|---|---|---|
+| **User Portal** | [http://localhost:3000](http://localhost:3000) | Register directly as **Donor** or **NGO** |
+| **Admin Portal** | [http://localhost:3001](http://localhost:3001) | Default Password: `admin123` |
+
+---
+
+## 💡 Troubleshooting & Database Reset
+
+- **MongoDB Connection Error (`ECONNREFUSED 127.0.0.1:27017`)**:
+  - Open Windows **Services** (`services.msc`) and verify that `MongoDB Server` status is **Running**.
+- **Port Conflict (`EADDRINUSE`)**:
+  - Verify that ports `3000`, `3001`, `5000`, or `5001` are not being used by other software.
+- **Database Reset / Clear Data**:
+  - To wipe test data while keeping the admin login intact, run:
+    ```bash
+    cd admin/server && node scripts/clearAllData.js
+    ```

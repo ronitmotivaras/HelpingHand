@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import {
   Inbox,
@@ -44,6 +44,16 @@ export default function NgoVerification() {
   // Details Modal (Show More)
   const [detailsNgo, setDetailsNgo] = useState(null);
 
+  // Verify Confirmation Modal State
+  const [verifyModalItem, setVerifyModalItem] = useState(null); // { id, name }
+  const [isVerifying, setIsVerifying] = useState(false);
+  const verifyConfirmBtnRef = useRef(null);
+
+  // Pending Confirmation Modal State
+  const [pendingModalItem, setPendingModalItem] = useState(null); // { id, name }
+  const [isSettingPending, setIsSettingPending] = useState(false);
+  const pendingConfirmBtnRef = useRef(null);
+
   // Decline Modal State
   const [declineModalItem, setDeclineModalItem] = useState(null); // { id, name }
   const [declineReason, setDeclineReason] = useState('');
@@ -53,10 +63,47 @@ export default function NgoVerification() {
   const [blockingNgo, setBlockingNgo] = useState(null); // { id, name, phone }
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
+  const blockConfirmBtnRef = useRef(null);
+
+  // Unblock Modal State
+  const [unblockingNgo, setUnblockingNgo] = useState(null); // { id, name }
+  const [isUnblocking, setIsUnblocking] = useState(false);
+  const unblockConfirmBtnRef = useRef(null);
 
   // Delete Modal State
   const [deleteModalItem, setDeleteModalItem] = useState(null); // { id, name }
   const [isDeleting, setIsDeleting] = useState(false);
+  const deleteConfirmBtnRef = useRef(null);
+
+  useEffect(() => {
+    if (blockingNgo && blockConfirmBtnRef.current) {
+      blockConfirmBtnRef.current.focus();
+    }
+  }, [blockingNgo]);
+
+  useEffect(() => {
+    if (unblockingNgo && unblockConfirmBtnRef.current) {
+      unblockConfirmBtnRef.current.focus();
+    }
+  }, [unblockingNgo]);
+
+  useEffect(() => {
+    if (deleteModalItem && deleteConfirmBtnRef.current) {
+      deleteConfirmBtnRef.current.focus();
+    }
+  }, [deleteModalItem]);
+
+  useEffect(() => {
+    if (verifyModalItem && verifyConfirmBtnRef.current) {
+      verifyConfirmBtnRef.current.focus();
+    }
+  }, [verifyModalItem]);
+
+  useEffect(() => {
+    if (pendingModalItem && pendingConfirmBtnRef.current) {
+      pendingConfirmBtnRef.current.focus();
+    }
+  }, [pendingModalItem]);
 
   async function loadNgos() {
     setLoading(true);
@@ -81,31 +128,41 @@ export default function NgoVerification() {
   }, []);
 
   // Action: Verify NGO
-  async function handleVerify(id, ngoName) {
+  async function confirmVerifyAction() {
+    if (!verifyModalItem) return;
+    const { id, name } = verifyModalItem;
+    setIsVerifying(true);
     setProcessingId(id);
     try {
       await api.patch(`/api/admin/ngo-requests/${id}/approve`);
-      toast.success(`"${ngoName || 'NGO'}" verified successfully.`);
+      toast.success(`"${name || 'NGO'}" verified successfully.`);
+      setVerifyModalItem(null);
       await loadNgos();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to verify NGO');
     } finally {
+      setIsVerifying(false);
       setProcessingId(null);
     }
   }
 
   // Action: Set to Pending
-  async function handleSetPending(id, ngoName) {
+  async function confirmSetPendingAction() {
+    if (!pendingModalItem) return;
+    const { id, name } = pendingModalItem;
+    setIsSettingPending(true);
     setProcessingId(id);
     try {
       await api.patch(`/api/admin/ngo-requests/${id}/pending`);
-      toast.success(`"${ngoName || 'NGO'}" status moved to Pending review.`);
+      toast.success(`"${name || 'NGO'}" status moved to Pending review.`);
+      setPendingModalItem(null);
       await loadNgos();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to update status');
     } finally {
+      setIsSettingPending(false);
       setProcessingId(null);
     }
   }
@@ -153,16 +210,21 @@ export default function NgoVerification() {
   }
 
   // Action: Confirm Unblock
-  async function handleUnblockNgo(id, ngoName) {
+  async function confirmUnblockNgo() {
+    if (!unblockingNgo) return;
+    const { id, name } = unblockingNgo;
+    setIsUnblocking(true);
     setProcessingId(id);
     try {
       await api.post(`/api/admin/users/${id}/unblock`);
-      toast.success(`"${ngoName || 'NGO'}" unblocked and returned to Pending list.`);
+      toast.success(`"${name || 'NGO'}" unblocked and returned to Pending list.`);
+      setUnblockingNgo(null);
       await loadNgos();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to unblock NGO');
     } finally {
+      setIsUnblocking(false);
       setProcessingId(null);
     }
   }
@@ -463,7 +525,7 @@ export default function NgoVerification() {
                                   className="btn-admin-outline d-inline-flex align-items-center gap-1"
                                   style={{ padding: '5px 11px', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', borderColor: 'rgba(26, 122, 46, 0.3)' }}
                                   disabled={isProcessing}
-                                  onClick={() => handleUnblockNgo(ngo.id, ngoName)}
+                                  onClick={() => setUnblockingNgo({ id: ngo.id, name: ngoName })}
                                   title="Unblock NGO and return to Pending review"
                                 >
                                   <RotateCcw size={14} />
@@ -490,7 +552,7 @@ export default function NgoVerification() {
                                     className="btn-admin-primary d-inline-flex align-items-center gap-1"
                                     style={{ padding: '5px 11px', fontSize: 'var(--text-sm)' }}
                                     disabled={isProcessing}
-                                    onClick={() => handleVerify(ngo.id, ngoName)}
+                                    onClick={() => setVerifyModalItem({ id: ngo.id, name: ngoName })}
                                     title="Verify NGO"
                                   >
                                     <CheckCircle2 size={14} />
@@ -505,7 +567,7 @@ export default function NgoVerification() {
                                     className="btn-admin-outline d-inline-flex align-items-center gap-1"
                                     style={{ padding: '5px 11px', fontSize: 'var(--text-sm)', color: '#d97706', borderColor: '#fde68a' }}
                                     disabled={isProcessing}
-                                    onClick={() => handleSetPending(ngo.id, ngoName)}
+                                    onClick={() => setPendingModalItem({ id: ngo.id, name: ngoName })}
                                     title="Move back to Pending"
                                   >
                                     <RotateCcw size={14} />
@@ -700,6 +762,129 @@ export default function NgoVerification() {
           </div>
         )}
 
+        {/* Modal: Verify NGO Confirmation */}
+        {verifyModalItem && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000,
+              padding: '16px',
+            }}
+            onClick={() => !isVerifying && setVerifyModalItem(null)}
+          >
+            <div
+              style={{
+                maxWidth: '460px',
+                width: '100%',
+                background: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-xl)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '28px',
+                border: '1px solid var(--color-border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center gap-2 mb-2" style={{ color: 'var(--color-primary)' }}>
+                <CheckCircle2 size={22} />
+                <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                  Verify NGO Partner
+                </h3>
+              </div>
+              <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to verify <strong>&quot;{verifyModalItem.name}&quot;</strong>? This will grant them access to request food pickup donations.
+              </p>
+
+              <div className="d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  className="btn-admin-outline"
+                  onClick={() => setVerifyModalItem(null)}
+                  disabled={isVerifying}
+                >
+                  Cancel
+                </button>
+                <button
+                  ref={verifyConfirmBtnRef}
+                  type="button"
+                  className="btn-admin-primary d-inline-flex align-items-center gap-1"
+                  onClick={confirmVerifyAction}
+                  disabled={isVerifying}
+                >
+                  <CheckCircle2 size={15} />
+                  <span>{isVerifying ? 'Verifying...' : 'Confirm Verify'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Push Back to Pending Confirmation */}
+        {pendingModalItem && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000,
+              padding: '16px',
+            }}
+            onClick={() => !isSettingPending && setPendingModalItem(null)}
+          >
+            <div
+              style={{
+                maxWidth: '460px',
+                width: '100%',
+                background: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-xl)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '28px',
+                border: '1px solid var(--color-border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center gap-2 mb-2" style={{ color: '#d97706' }}>
+                <RotateCcw size={22} />
+                <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                  Move to Pending Review
+                </h3>
+              </div>
+              <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to move <strong>&quot;{pendingModalItem.name}&quot;</strong> back to Pending status? Any active uncollected pickup requests will be automatically cancelled.
+              </p>
+
+              <div className="d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  className="btn-admin-outline"
+                  onClick={() => setPendingModalItem(null)}
+                  disabled={isSettingPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  ref={pendingConfirmBtnRef}
+                  type="button"
+                  className="btn-admin-primary d-inline-flex align-items-center gap-1"
+                  style={{ background: '#d97706', borderColor: '#d97706' }}
+                  onClick={confirmSetPendingAction}
+                  disabled={isSettingPending}
+                >
+                  <RotateCcw size={15} />
+                  <span>{isSettingPending ? 'Updating...' : 'Move to Pending'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal: Decline NGO Application (with Notes input) */}
         {declineModalItem && (
           <div
@@ -835,6 +1020,7 @@ export default function NgoVerification() {
                   Cancel
                 </button>
                 <button
+                  ref={blockConfirmBtnRef}
                   type="button"
                   className="btn-admin-danger d-inline-flex align-items-center gap-1"
                   onClick={confirmBlockNgo}
@@ -895,12 +1081,74 @@ export default function NgoVerification() {
                   Cancel
                 </button>
                 <button
+                  ref={deleteConfirmBtnRef}
                   type="button"
                   className="btn-admin-danger"
                   onClick={handleDeleteConfirm}
                   disabled={isDeleting}
                 >
                   {isDeleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Unblock NGO Confirmation */}
+        {unblockingNgo && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000,
+              padding: '16px',
+            }}
+            onClick={() => !isUnblocking && setUnblockingNgo(null)}
+          >
+            <div
+              style={{
+                maxWidth: '460px',
+                width: '100%',
+                background: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-xl)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '28px',
+                border: '1px solid var(--color-border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center gap-2 mb-2" style={{ color: 'var(--color-primary)' }}>
+                <RotateCcw size={22} />
+                <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                  Unblock NGO Account
+                </h3>
+              </div>
+              <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to unblock <strong>&quot;{unblockingNgo.name}&quot;</strong>? Their account access will be restored and returned to the Pending verification list.
+              </p>
+
+              <div className="d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  className="btn-admin-outline"
+                  onClick={() => setUnblockingNgo(null)}
+                  disabled={isUnblocking}
+                >
+                  Cancel
+                </button>
+                <button
+                  ref={unblockConfirmBtnRef}
+                  type="button"
+                  className="btn-admin-primary d-inline-flex align-items-center gap-1"
+                  onClick={confirmUnblockNgo}
+                  disabled={isUnblocking}
+                >
+                  <RotateCcw size={15} />
+                  <span>{isUnblocking ? 'Unblocking...' : 'Confirm Unblock'}</span>
                 </button>
               </div>
             </div>

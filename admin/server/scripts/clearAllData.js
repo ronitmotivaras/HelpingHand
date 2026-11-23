@@ -1,6 +1,6 @@
 /**
  * Clear All Data Script
- * Removes all entries from both admin and mainweb databases.
+ * Removes all entries from both admin and portal databases.
  * Both servers share the same MongoDB database (helpinghand),
  * so this script clears everything from one connection.
  *
@@ -33,7 +33,7 @@ async function clearAllData() {
   }
 
   console.log('\nAll data cleared successfully (admin login preserved).');
-  console.log('You can re-seed data with: node ../mainweb/server/scripts/seedDynamicData.js');
+  console.log('You can re-seed data with: node ../portal/server/scripts/seedDynamicData.js');
 
   await mongoose.disconnect();
 }

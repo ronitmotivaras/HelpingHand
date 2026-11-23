@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import {
   Ban,
@@ -37,10 +37,24 @@ export default function BlockedAccounts() {
   // Unblock Modal State
   const [unblockingUser, setUnblockingUser] = useState(null);
   const [isUnblocking, setIsUnblocking] = useState(false);
+  const unblockConfirmBtnRef = useRef(null);
 
   // Delete Modal State
   const [deletingUser, setDeletingUser] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const deleteConfirmBtnRef = useRef(null);
+
+  useEffect(() => {
+    if (unblockingUser && unblockConfirmBtnRef.current) {
+      unblockConfirmBtnRef.current.focus();
+    }
+  }, [unblockingUser]);
+
+  useEffect(() => {
+    if (deletingUser && deleteConfirmBtnRef.current) {
+      deleteConfirmBtnRef.current.focus();
+    }
+  }, [deletingUser]);
 
   async function loadData() {
     setLoading(true);
@@ -487,6 +501,7 @@ export default function BlockedAccounts() {
                   Cancel
                 </button>
                 <button
+                  ref={unblockConfirmBtnRef}
                   type="button"
                   className="btn-admin-primary d-inline-flex align-items-center gap-1"
                   disabled={isUnblocking}
@@ -548,6 +563,7 @@ export default function BlockedAccounts() {
                   Cancel
                 </button>
                 <button
+                  ref={deleteConfirmBtnRef}
                   type="button"
                   className="btn-admin-danger d-inline-flex align-items-center gap-1"
                   disabled={isDeleting}

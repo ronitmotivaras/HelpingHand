@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import {
   Trash2,
@@ -33,13 +33,35 @@ export default function UserAccounts() {
   const [blockingUser, setBlockingUser] = useState(null);
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
+  const blockConfirmBtnRef = useRef(null);
 
-  // Unblock State
+  // Unblock Modal State
+  const [unblockingUser, setUnblockingUser] = useState(null);
   const [isUnblocking, setIsUnblocking] = useState(false);
+  const unblockConfirmBtnRef = useRef(null);
 
   // Delete Confirmation Modal State
   const [deletingUser, setDeletingUser] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const deleteConfirmBtnRef = useRef(null);
+
+  useEffect(() => {
+    if (blockingUser && blockConfirmBtnRef.current) {
+      blockConfirmBtnRef.current.focus();
+    }
+  }, [blockingUser]);
+
+  useEffect(() => {
+    if (unblockingUser && unblockConfirmBtnRef.current) {
+      unblockConfirmBtnRef.current.focus();
+    }
+  }, [unblockingUser]);
+
+  useEffect(() => {
+    if (deletingUser && deleteConfirmBtnRef.current) {
+      deleteConfirmBtnRef.current.focus();
+    }
+  }, [deletingUser]);
 
   async function loadUsers() {
     setLoading(true);
@@ -50,6 +72,10 @@ export default function UserAccounts() {
       ]);
       setUsers(usersRes.data);
       setStats(statsRes.data);
+      if (detailsUser) {
+        const updated = usersRes.data.find((u) => u.id === detailsUser.id);
+        if (updated) setDetailsUser(updated);
+      }
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
       toast.error(err.response?.data?.message || 'Failed to load donator accounts');
@@ -106,12 +132,14 @@ export default function UserAccounts() {
     }
   }
 
-  async function handleUnblockUser(user) {
+  async function confirmUnblockUser() {
+    if (!unblockingUser) return;
     setIsUnblocking(true);
     try {
-      await api.post(`/api/admin/users/${user.id}/unblock`);
-      toast.success(`Donator "${user.name}" unblocked and account restored.`);
-      if (detailsUser?.id === user.id) setDetailsUser(null);
+      await api.post(`/api/admin/users/${unblockingUser.id}/unblock`);
+      toast.success(`Donator "${unblockingUser.name}" unblocked and account restored.`);
+      if (detailsUser?.id === unblockingUser.id) setDetailsUser(null);
+      setUnblockingUser(null);
       await loadUsers();
     } catch (err) {
       if (err.response?.status === 401 || err.name === 'CanceledError' || err.message === 'Session expired') return;
@@ -332,7 +360,7 @@ export default function UserAccounts() {
                                   borderColor: 'rgba(26, 122, 46, 0.3)',
                                 }}
                                 disabled={isUnblocking}
-                                onClick={() => handleUnblockUser(user)}
+                                onClick={() => setUnblockingUser(user)}
                                 title="Unblock donator and restore account access"
                               >
                                 <RotateCcw size={14} />
@@ -517,6 +545,7 @@ export default function UserAccounts() {
                   Cancel
                 </button>
                 <button
+                  ref={deleteConfirmBtnRef}
                   type="button"
                   className="btn-admin-danger"
                   onClick={handleConfirmDelete}
@@ -591,6 +620,7 @@ export default function UserAccounts() {
                   Cancel
                 </button>
                 <button
+                  ref={blockConfirmBtnRef}
                   type="button"
                   className="btn-admin-danger d-inline-flex align-items-center gap-1"
                   onClick={confirmBlockUser}
@@ -598,6 +628,68 @@ export default function UserAccounts() {
                 >
                   <Ban size={15} />
                   <span>{isBlocking ? 'Blocking...' : 'Block Account'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Unblock Donator Confirmation Modal */}
+        {unblockingUser && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000,
+              padding: '16px',
+            }}
+            onClick={() => !isUnblocking && setUnblockingUser(null)}
+          >
+            <div
+              className="admin-edit-box"
+              style={{
+                maxWidth: '460px',
+                width: '100%',
+                background: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-lg)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-6)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center gap-2 mb-2" style={{ color: 'var(--color-primary)' }}>
+                <RotateCcw size={22} />
+                <h3 className="card-title m-0" style={{ fontSize: '18px' }}>
+                  Unblock Donor Account
+                </h3>
+              </div>
+
+              <p className="text-muted mb-4" style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to unblock donator <strong>&quot;{unblockingUser.name}&quot;</strong>? Their account access will be immediately restored.
+              </p>
+
+              <div className="d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  className="btn-admin-outline"
+                  onClick={() => setUnblockingUser(null)}
+                  disabled={isUnblocking}
+                >
+                  Cancel
+                </button>
+                <button
+                  ref={unblockConfirmBtnRef}
+                  type="button"
+                  className="btn-admin-primary d-inline-flex align-items-center gap-1"
+                  onClick={confirmUnblockUser}
+                  disabled={isUnblocking}
+                >
+                  <RotateCcw size={15} />
+                  <span>{isUnblocking ? 'Unblocking...' : 'Confirm Unblock'}</span>
                 </button>
               </div>
             </div>
